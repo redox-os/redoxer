@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -ex
+set -e
 
 if [ ! -f "$1" ]
 then
@@ -11,25 +11,43 @@ fi
 export TARGET=x86_64-unknown-redox
 
 sudo rm -rf build/redoxer build/redoxer.bin
-rm -f build/redoxer-qemu.bin
+rm -f build/redoxer.log build/redoxer-qemu.bin
 mkdir -p build/redoxer
 if ! which redox_installer >/dev/null
 then
-    cargo install --git https://gitlab.redox-os.org/redox-os/installer.git
+    cargo \
+        install \
+        --git https://gitlab.redox-os.org/redox-os/installer.git \
+        >>build/redoxer.log
 fi
-sudo "$(which redox_installer)" -c redoxer.toml build/redoxer
+sudo "$(which redox_installer)" \
+    -c redoxer.toml \
+    build/redoxer \
+    &>>build/redoxer.log
 
 name="$(basename "$1")"
 sudo cp "$1" "build/redoxer/bin/$name"
-echo "stdio debug:" | sudo tee build/redoxer/etc/init.d/10_redoxer
-echo "echo <redoxer>" | sudo tee -a build/redoxer/etc/init.d/10_redoxer
-echo "$name" | sudo tee -a build/redoxer/etc/init.d/10_redoxer
-echo "echo </redoxer>" | sudo tee -a build/redoxer/etc/init.d/10_redoxer
+cat > build/redoxer.init <<EOF
+stdio debug:
+echo <redoxer>
+$name
+echo </redoxer>
+shutdown
+EOF
+sudo cp build/redoxer.init build/redoxer/etc/init.d/10_redoxer
+
 if ! which redoxfs >/dev/null
 then
-    cargo install redoxfs
+    cargo \
+        install \
+        redoxfs \
+        >>build/redoxer.log
 fi
-sudo "$(which redoxfs-ar)" build/redoxer.bin build/redoxer build/redoxer/bootloader
+sudo "$(which redoxfs-ar)" \
+    build/redoxer.bin \
+    build/redoxer \
+    build/redoxer/bootloader \
+    >>build/redoxer.log
 
 cp build/redoxer.bin build/redoxer-qemu.bin
 qemu-system-x86_64 \
@@ -42,4 +60,7 @@ qemu-system-x86_64 \
     -nographic -vga none \
     -enable-kvm \
     -cpu host \
-    -drive file=build/redoxer-qemu.bin,format=raw
+    -drive file=build/redoxer-qemu.bin,format=raw \
+    >>build/redoxer.log
+
+sed '/<redoxer>$/,/<\/redoxer>$/{//!b};d' build/redoxer.log
