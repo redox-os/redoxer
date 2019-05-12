@@ -147,8 +147,7 @@ pub fn main() {
         Err(err) => {
             eprintln!("redoxerd: {}", err);
             // Exit with error using qemu device
-            let status = 0x21;
-            Pio::<u8>::new(0x501).write(status >> 1);
+            Pio::<u8>::new(0x501).write(1);
         }
     }
 }

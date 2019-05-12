@@ -90,8 +90,6 @@ function redoxfs_mount {
     done
 }
 
-name="$(basename "$1")"
-
 if [ ! -f build/bootloader.bin ]
 then
     echo "building bootloader" >&2
@@ -139,12 +137,24 @@ mkdir -p "build/${uuid}"
 redoxfs_mount "build/${uuid}.bin" "build/${uuid}"
 
 cp "target/${TARGET}/release/redoxerd" "build/${uuid}/bin/redoxerd"
+
+if [[ "$1" == */* ]]
+then
+    name="$(basename "$1")"
+    cp "$1" "build/${uuid}/bin/${name}"
+    echo "${name}" >> "build/${uuid}/etc/redoxerd"
+    shift
+fi
+
 for arg in "$@"
 do
     echo "${arg}" >> "build/${uuid}/etc/redoxerd"
 done
 
+
 redoxfs_unmount "build/${uuid}"
+
+set +e
 
 qemu-system-x86_64 \
     -enable-kvm \
@@ -161,7 +171,10 @@ qemu-system-x86_64 \
     -nographic \
     -vga none \
     -drive file="build/${uuid}.bin",format=raw
+status="$(("$?" / 2))"
 
 echo
-echo "## redoxer $@ ##"
+echo "## redoxer (${status}) ##"
 cat "build/${uuid}.log"
+
+exit "${status}"
