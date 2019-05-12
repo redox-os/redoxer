@@ -2,6 +2,8 @@
 
 set -e
 
+exec 3>&1 1>&2
+
 export TARGET=x86_64-unknown-redox
 xargo rustc --bin redoxerd --release --target "${TARGET}" -- -C linker="${TARGET}-gcc"
 
@@ -177,17 +179,17 @@ echo
 case "${status}" in
     51)
         echo "## redoxer (success) ##"
-        cat "build/${uuid}.log"
+        cat "build/${uuid}.log" >&3
         exit 0
         ;;
     53)
         echo "## redoxer (failure) ##"
-        cat "build/${uuid}.log"
+        cat "build/${uuid}.log" >&3
         exit 1
         ;;
     *)
         echo "## redoxer (failure, qemu exit code ${status}) ##"
-        cat "build/${uuid}.log"
+        cat "build/${uuid}.log" >&3
         exit 2
         ;;
 esac
