@@ -143,11 +143,12 @@ pub fn main() {
         Ok(()) => {
             // Exit with success using qemu device
             Pio::<u16>::new(0x604).write(0x2000);
+            Pio::<u8>::new(0x501).write(51 / 2);
         },
         Err(err) => {
             eprintln!("redoxerd: {}", err);
             // Exit with error using qemu device
-            Pio::<u8>::new(0x501).write(1);
+            Pio::<u8>::new(0x501).write(53 / 2);
         }
     }
 }

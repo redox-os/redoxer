@@ -171,10 +171,23 @@ qemu-system-x86_64 \
     -nographic \
     -vga none \
     -drive file="build/${uuid}.bin",format=raw
-status="$(("$?" / 2))"
+status="$?"
 
 echo
-echo "## redoxer (${status}) ##"
-cat "build/${uuid}.log"
-
-exit "${status}"
+case "${status}" in
+    51)
+        echo "## redoxer (success) ##"
+        cat "build/${uuid}.log"
+        exit 0
+        ;;
+    53)
+        echo "## redoxer (failure) ##"
+        cat "build/${uuid}.log"
+        exit 1
+        ;;
+    *)
+        echo "## redoxer (failure, qemu exit code ${status}) ##"
+        cat "build/${uuid}.log"
+        exit 2
+        ;;
+esac
