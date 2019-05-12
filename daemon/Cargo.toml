@@ -1,0 +1,9 @@
+[package]
+name = "redoxerd"
+version = "0.1.0"
+authors = ["Jeremy Soller <jeremy@system76.com>"]
+edition = "2018"
+
+[dependencies]
+redox_syscall = "0.1"
+redox_termios = "0.1"
