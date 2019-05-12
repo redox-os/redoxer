@@ -130,12 +130,17 @@ fn running(program: &str) -> io::Result<bool> {
         .map(|x| x.success())
 }
 
-fn bootloader() -> io::Result<&'static Path> {
-    let bootloader_bin = Path::new("build/bootloader.bin");
+fn redoxer_dir() -> PathBuf {
+    dirs::home_dir().unwrap_or(PathBuf::from("."))
+        .join(".redoxer")
+}
+
+fn bootloader() -> io::Result<PathBuf> {
+    let bootloader_bin = redoxer_dir().join("bootloader.bin");
     if ! bootloader_bin.is_file() {
         eprintln!("redoxer: building bootloader");
 
-        let bootloader_dir = Path::new("build/bootloader");
+        let bootloader_dir = redoxer_dir().join("bootloader");
         if bootloader_dir.is_dir() {
             fs::remove_dir_all(&bootloader_dir)?;
         }
@@ -151,23 +156,23 @@ fn bootloader() -> io::Result<&'static Path> {
             )
         })?;
 
-        fs::rename(&bootloader_dir.join("bootloader"), bootloader_bin)?;
+        fs::rename(&bootloader_dir.join("bootloader"), &bootloader_bin)?;
     }
     Ok(bootloader_bin)
 }
 
-fn base(bootloader_bin: &Path) -> io::Result<&'static Path> {
-    let base_bin = Path::new("build/base.bin");
+fn base(bootloader_bin: &Path) -> io::Result<PathBuf> {
+    let base_bin = redoxer_dir().join("base.bin");
     if ! base_bin.is_file() {
         eprintln!("redoxer: building base");
 
-        let base_dir = Path::new("build/base");
+        let base_dir = redoxer_dir().join("base");
         if base_dir.is_dir() {
             fs::remove_dir_all(&base_dir)?;
         }
         fs::create_dir_all(&base_dir)?;
 
-        let base_partial = Path::new("build/base.bin.partial");
+        let base_partial = redoxer_dir().join("base.bin.partial");
         Command::new("dd")
             .arg("if=/dev/zero")
             .arg(format!("of={}", base_partial.display()))
@@ -218,7 +223,7 @@ fn inner() -> io::Result<()> {
     }
 
     let bootloader_bin = bootloader()?;
-    let base_bin = base(bootloader_bin)?;
+    let base_bin = base(&bootloader_bin)?;
 
     let tempdir = tempfile::tempdir()?;
 
@@ -231,12 +236,6 @@ fn inner() -> io::Result<()> {
 
         {
             let mut redoxfs = RedoxFs::new(&redoxer_bin, &redoxer_dir)?;
-
-            //TODO: Use redoxerd package
-            fs::copy(
-                "daemon/target/x86_64-unknown-redox/release/redoxerd",
-                redoxer_dir.join("bin/redoxerd")
-            )?;
 
             let mut redoxerd_config = String::new();
             for (i, arg) in env::args().skip(1).enumerate() {
