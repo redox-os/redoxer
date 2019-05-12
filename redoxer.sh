@@ -2,65 +2,160 @@
 
 set -e
 
-if [ ! -f "$1" ]
+export TARGET=x86_64-unknown-redox
+xargo rustc --bin redoxerd --release --target "${TARGET}" -- -C linker="${TARGET}-gcc"
+
+if [ ! -n "$1" ]
 then
-    echo "$0 [program]" >&2
+    echo "$0 [program] <args...>" >&2
     exit 1
 fi
 
-export TARGET=x86_64-unknown-redox
-
-sudo rm -rf build/redoxer build/redoxer.bin
-rm -f build/redoxer.log build/redoxer-qemu.bin
-mkdir -p build/redoxer
 if ! which redox_installer >/dev/null
 then
+    echo "redox_installer not found" >&2
     cargo \
         install \
-        --git https://gitlab.redox-os.org/redox-os/installer.git \
-        >>build/redoxer.log
+        --git https://gitlab.redox-os.org/redox-os/installer.git
 fi
-sudo "$(which redox_installer)" \
-    -c redoxer.toml \
-    build/redoxer \
-    &>>build/redoxer.log
-
-name="$(basename "$1")"
-sudo cp "$1" "build/redoxer/bin/$name"
-cat > build/redoxer.init <<EOF
-stdio debug:
-echo <redoxer>
-$name
-echo </redoxer>
-shutdown
-EOF
-sudo cp build/redoxer.init build/redoxer/etc/init.d/10_redoxer
 
 if ! which redoxfs >/dev/null
 then
+    echo "redoxfs not found" >&2
     cargo \
         install \
-        redoxfs \
-        >>build/redoxer.log
+        redoxfs
 fi
-sudo "$(which redoxfs-ar)" \
-    build/redoxer.bin \
-    build/redoxer \
-    build/redoxer/bootloader \
-    >>build/redoxer.log
 
-cp build/redoxer.bin build/redoxer-qemu.bin
+if ! which qemu-system-x86_64 >/dev/null
+then
+    echo "qemu-system-x86_64 not found" >&2
+    exit 1
+fi
+
+
+function redoxfs_mounted {
+    if [ -z "$1" ]
+    then
+        echo "redoxfs_mounted [directory]" >&2
+        return 1
+    fi
+
+    # TODO: Escape path
+    grep "^/dev/fuse $(realpath -m "$1") fuse" /proc/mounts >/dev/null
+}
+
+function redoxfs_unmount {
+    if [ -z "$1" ]
+    then
+        echo "redoxfs_unmount [directory]" >&2
+        return 1
+    fi
+
+    if redoxfs_mounted "$1"
+    then
+        fusermount -u "$1"
+    fi
+
+    if ! redoxfs_mounted "$1"
+    then
+        return 0
+    else
+        echo "redoxfs_unmount: failed to unmount '$1'" >&2
+        return 1
+    fi
+}
+
+function redoxfs_mount {
+    if [ -z "$1" -o -z "$2" ]
+    then
+        echo "redoxfs_mount [image] [directory]" >&2
+        return 1
+    fi
+
+    if ! redoxfs_unmount "$2"
+    then
+        echo "redoxfs_mount: failed to first unmount '$2'" >&2
+        return 1
+    fi
+
+    redoxfs build/redoxer.bin build/redoxer
+    while ! redoxfs_mounted "$2"
+    do
+        if ! pgrep redoxfs >/dev/null
+        then
+            echo "redoxfs_mount: failed to mount '$1' to '$2'" >&2
+            return 1
+        fi
+    done
+}
+
+redoxfs_unmount build/redoxer
+rm -rf build/redoxer build/redoxer.bin build/redoxer.log
+
+name="$(basename "$1")"
+
+if [ ! -f build/bootloader.bin ]
+then
+    echo "building bootloader" >&2
+
+    rm -rf build/bootloader.bin build/bootloader
+
+    mkdir -p build/bootloader
+    redox_installer -c bootloader.toml build/bootloader
+
+    mv build/bootloader/bootloader build/bootloader.bin
+fi
+
+if [ ! -f build/base.bin ]
+then
+    echo "building base" >&2
+
+    redoxfs_unmount build/base
+    rm -rf build/base.bin build/base.bin.partial build/base
+
+    dd if=/dev/zero of=build/base.bin.partial bs=4096 count=65536
+    redoxfs-mkfs build/base.bin.partial build/bootloader.bin
+
+    mkdir -p build/base
+    redoxfs_mount build/base.bin.partial build/base
+
+    redox_installer -c base.toml build/base
+
+    redoxfs_unmount build/base
+
+    mv build/base.bin.partial build/base.bin
+fi
+
+cp build/base.bin build/redoxer.bin
+
+mkdir -p build/redoxer
+redoxfs_mount build/redoxer.bin build/redoxer
+
+cp "target/${TARGET}/release/redoxerd" "build/redoxer/bin/redoxerd"
+for arg in "$@"
+do
+    echo "${arg}" >> build/redoxer/etc/redoxerd
+done
+
+redoxfs_unmount build/redoxer
+
 qemu-system-x86_64 \
-    -smp 4 \
-    -m 2048 \
-    -serial mon:stdio \
-    -machine q35 \
-    -device ich9-intel-hda -device hda-duplex \
-    -netdev user,id=net0 -device e1000,netdev=net0 \
-    -nographic -vga none \
     -enable-kvm \
     -cpu host \
-    -drive file=build/redoxer-qemu.bin,format=raw \
-    >>build/redoxer.log
+    -machine q35 \
+    -m 2048 \
+    -smp 4 \
+    -serial mon:stdio \
+    -chardev file,id=log,path=build/redoxer.log \
+    -device isa-debugcon,chardev=log \
+    -device isa-debug-exit \
+    -netdev user,id=net0 \
+    -device e1000,netdev=net0 \
+    -nographic \
+    -vga none \
+    -drive file=build/redoxer.bin,format=raw
 
-sed '/<redoxer>$/,/<\/redoxer>$/{//!b};d' build/redoxer.log
+echo
+echo "## redoxer $@ ##"
+cat build/redoxer.log

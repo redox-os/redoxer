@@ -1,0 +1,5 @@
+[general]
+prompt = false
+
+[packages]
+bootloader = {}

@@ -13,8 +13,7 @@ prompt = false
 #automake = {}
 #bash = {}
 #binutils = {}
-bootloader = {}
-#ca-certificates = {}
+ca-certificates = {}
 #cairo = {}
 #cairodemo = {}
 #cargo = {}
@@ -27,16 +26,16 @@ coreutils = {}
 #dash = {}
 #diffutils = {}
 #dosbox = {}
-#drivers = {}
+drivers = {}
 #drivers-041 = {}
 #duktape = {}
 #eduke32 = {}
 #exampled = {}
 #expat = {}
-#extrautils = {}
+extrautils = {}
 #fd = {}
 #ffmpeg = {}
-#findutils = {}
+findutils = {}
 #freeciv = {}
 #freedoom = {}
 #freeglut = {}
@@ -86,13 +85,13 @@ logd = {}
 #ncdu = {}
 #ncurses = {}
 #ncursesw = {}
-#netdb = {}
-#netstack = {}
+netdb = {}
+netstack = {}
 #netsurf = {}
-#netutils = {}
+netutils = {}
 #newlib = {}
 #newlibtest = {}
-#nulld = {}
+nulld = {}
 #openjazz = {}
 #openssl = {}
 #openttd = {}
@@ -117,7 +116,7 @@ logd = {}
 ptyd = {}
 #python = {}
 #qemu = {}
-#randd = {}
+randd = {}
 #readline = {} # ncurses
 #redoxfs = {}
 #redox-ssh = {}
@@ -152,13 +151,13 @@ ptyd = {}
 #timidity = {}
 #ttf-hack = {}
 #userutils = {}
-#uutils = {}
+uutils = {}
 #vim = {}
 #vttest = {}
 #webrender = {}
 #winit = {}
 #xz = {}
-#zerod = {}
+zerod = {}
 #zlib = {}
 
 # User settings
@@ -176,9 +175,69 @@ password = ""
 [[files]]
 path = "/etc/init.d/00_base"
 data = """
+nulld
+zerod
+randd
 ipcd
 logd
 ptyd
+# pcid /etc/pcid/filesystem.toml
+"""
+
+[[files]]
+path = "/etc/init.d/10_net"
+data = """
+# smolnetd
+# dnsd
+# dhcpd
+"""
+
+[[files]]
+path = "/etc/init.d/20_redoxer"
+data = """
+redoxerd
+"""
+
+[[files]]
+path = "/etc/net/dns"
+data = """
+208.67.222.222
+"""
+
+[[files]]
+path = "/etc/net/ip"
+data = """
+10.0.2.15
+"""
+
+[[files]]
+path = "/etc/net/ip_router"
+data = """
+10.0.2.2
+"""
+
+[[files]]
+path = "/etc/net/ip_subnet"
+data = """
+255.255.255.0
+"""
+
+[[files]]
+path = "/etc/net/mac"
+data = """
+54-52-00-ab-cd-ef
+"""
+
+[[files]]
+path = "/etc/group"
+data = """
+root;0;root
+"""
+
+[[files]]
+path = "/etc/hostname"
+data = """
+redox
 """
 
 [[files]]

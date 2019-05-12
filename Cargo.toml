@@ -1,0 +1,15 @@
+[package]
+name = "redoxer"
+version = "0.1.0"
+authors = ["Jeremy Soller <jeremy@system76.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+redox_syscall = "0.1"
+redox_termios = "0.1"
+
+[patch.crates-io]
+atty = { git = "https://gitlab.redox-os.org/redox-os/atty.git", branch = "redox-unix" }
+libc = { git = "https://gitlab.redox-os.org/redox-os/liblibc.git", branch = "redox-unix" }
