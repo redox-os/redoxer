@@ -9,7 +9,3 @@ edition = "2018"
 [dependencies]
 redox_syscall = "0.1"
 redox_termios = "0.1"
-
-[patch.crates-io]
-atty = { git = "https://gitlab.redox-os.org/redox-os/atty.git", branch = "redox-unix" }
-libc = { git = "https://gitlab.redox-os.org/redox-os/liblibc.git", branch = "redox-unix" }
