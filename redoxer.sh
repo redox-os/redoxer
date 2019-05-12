@@ -79,7 +79,7 @@ function redoxfs_mount {
         return 1
     fi
 
-    redoxfs build/redoxer.bin build/redoxer
+    redoxfs "$1" "$2"
     while ! redoxfs_mounted "$2"
     do
         if ! pgrep redoxfs >/dev/null
@@ -89,9 +89,6 @@ function redoxfs_mount {
         fi
     done
 }
-
-redoxfs_unmount build/redoxer
-rm -rf build/redoxer build/redoxer.bin build/redoxer.log
 
 name="$(basename "$1")"
 
@@ -127,18 +124,27 @@ then
     mv build/base.bin.partial build/base.bin
 fi
 
-cp build/base.bin build/redoxer.bin
+uuid="$(uuidgen)"
+function cleanup {
+    redoxfs_unmount "build/${uuid}"
+    rm -rf "build/${uuid}" "build/${uuid}.bin" "build/${uuid}.log"
+}
+trap cleanup EXIT
 
-mkdir -p build/redoxer
-redoxfs_mount build/redoxer.bin build/redoxer
+cleanup
 
-cp "target/${TARGET}/release/redoxerd" "build/redoxer/bin/redoxerd"
+cp build/base.bin "build/${uuid}.bin"
+
+mkdir -p "build/${uuid}"
+redoxfs_mount "build/${uuid}.bin" "build/${uuid}"
+
+cp "target/${TARGET}/release/redoxerd" "build/${uuid}/bin/redoxerd"
 for arg in "$@"
 do
-    echo "${arg}" >> build/redoxer/etc/redoxerd
+    echo "${arg}" >> "build/${uuid}/etc/redoxerd"
 done
 
-redoxfs_unmount build/redoxer
+redoxfs_unmount "build/${uuid}"
 
 qemu-system-x86_64 \
     -enable-kvm \
@@ -147,15 +153,15 @@ qemu-system-x86_64 \
     -m 2048 \
     -smp 4 \
     -serial mon:stdio \
-    -chardev file,id=log,path=build/redoxer.log \
+    -chardev file,id=log,path="build/${uuid}.log" \
     -device isa-debugcon,chardev=log \
     -device isa-debug-exit \
     -netdev user,id=net0 \
     -device e1000,netdev=net0 \
     -nographic \
     -vga none \
-    -drive file=build/redoxer.bin,format=raw
+    -drive file="build/${uuid}.bin",format=raw
 
 echo
 echo "## redoxer $@ ##"
-cat build/redoxer.log
+cat "build/${uuid}.log"
