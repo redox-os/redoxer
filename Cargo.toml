@@ -1,7 +1,10 @@
 [package]
 name = "redoxer"
 version = "0.1.0"
+description = "Method for quickly running programs inside of Redox from a KVM capable OS."
+license = "MIT"
 authors = ["Jeremy Soller <jeremy@system76.com>"]
+repository = "https://gitlab.redox-os.org/redox-os/redoxer"
 edition = "2018"
 
 [dependencies]
