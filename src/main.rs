@@ -207,7 +207,80 @@ fn base(bootloader_bin: &Path) -> io::Result<PathBuf> {
     Ok(base_bin)
 }
 
-fn inner() -> io::Result<()> {
+//TODO: Rewrite with hyper or reqwest, tar-rs, sha2, and some gzip crate?
+fn download<P: AsRef<Path>>(url: &str, path: P) -> io::Result<()> {
+    Command::new("curl")
+        .arg("--proto").arg("=https")
+        .arg("--tlsv1.2")
+        .arg("--fail")
+        .arg("--output").arg(path.as_ref())
+        .arg(url)
+        .status()
+        .and_then(status_error)
+}
+
+//TODO: Rewrite with hyper or reqwest, tar-rs, sha2, and some gzip crate?
+fn shasum<P: AsRef<Path>>(path: P) -> io::Result<bool> {
+    let parent = path.as_ref().parent().ok_or(
+        io::Error::new(
+            io::ErrorKind::Other,
+            "shasum path had no parent"
+        )
+    )?;
+    Command::new("sha256sum")
+        .arg("--check")
+        .arg("--ignore-missing")
+        .arg("--quiet")
+        .arg(path.as_ref())
+        .current_dir(parent)
+        .status()
+        .map(|status| status.success())
+}
+
+//TODO: Rewrite with hyper or reqwest, tar-rs, sha2, and some gzip crate?
+fn prefix() -> io::Result<PathBuf> {
+    let url = "https://static.redox-os.org/toolchain/x86_64-unknown-redox";
+    let toolchain_dir = redoxer_dir().join("toolchain");
+    let prefix_dir = toolchain_dir.join("prefix");
+    if ! prefix_dir.is_dir() {
+        println!("redoxer: building prefix");
+
+        if toolchain_dir.is_dir() {
+            fs::remove_dir_all(&toolchain_dir)?;
+        }
+        fs::create_dir_all(&toolchain_dir)?;
+
+        let shasum_file = toolchain_dir.join("SHA256SUM");
+        download(&format!("{}/SHA256SUM", url), &shasum_file)?;
+
+        let prefix_tar = toolchain_dir.join("relibc-install.tar.gz");
+        download(&format!("{}/relibc-install.tar.gz", url), &prefix_tar)?;
+
+        if ! shasum(&shasum_file)? {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "shasum invalid"
+            ));
+        }
+
+        let prefix_partial = redoxer_dir().join("prefix.partial");
+        fs::create_dir_all(&prefix_partial)?;
+
+        Command::new("tar")
+            .arg("--extract")
+            .arg("--file").arg(&prefix_tar)
+            .arg("-C").arg(&prefix_partial)
+            .arg(".")
+            .status()
+            .and_then(status_error)?;
+
+        fs::rename(&prefix_partial, &prefix_dir)?;
+    }
+
+    Ok(prefix_dir)
+}
+
+fn inner() -> io::Result<i32> {
     if ! installed("kvm")? {
         eprintln!("redoxer: kvm not found, please install before continuing");
         process::exit(1);
@@ -224,10 +297,11 @@ fn inner() -> io::Result<()> {
 
     let bootloader_bin = bootloader()?;
     let base_bin = base(&bootloader_bin)?;
+    let prefix_dir = prefix()?;
 
     let tempdir = tempfile::tempdir()?;
 
-    {
+    let code = {
         let redoxer_bin = tempdir.path().join("redoxer.bin");
         fs::copy(&base_bin, &redoxer_bin)?;
 
@@ -274,34 +348,41 @@ fn inner() -> io::Result<()> {
             .arg("-drive").arg(format!("file={},format=raw", redoxer_bin.display()))
             .status()?;
 
-        match status.code() {
+        eprintln!();
+
+        let code = match status.code() {
             Some(51) => {
                 eprintln!("## redoxer (success) ##");
+                0
             },
             Some(53) => {
                 eprintln!("## redoxer (failure) ##");
-                //TODO: Return error
+                1
             },
             _ => {
                 eprintln!("## redoxer (failure, qemu exit status {:?} ##", status);
-                //TODO: Return error
+                2
             }
-        }
+        };
 
         print!("{}", fs::read_to_string(&redoxer_log)?);
-    }
+
+        code
+    };
 
     tempdir.close()?;
 
-    Ok(())
+    Ok(code)
 }
 
 fn main() {
     match inner() {
-        Ok(()) => (),
+        Ok(code) => {
+            process::exit(code);
+        },
         Err(err) => {
             eprintln!("redoxer: {}", err);
-            process::exit(1)
+            process::exit(3);
         }
     }
 }
