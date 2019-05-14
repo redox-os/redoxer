@@ -173,11 +173,9 @@ fn base(bootloader_bin: &Path) -> io::Result<PathBuf> {
         fs::create_dir_all(&base_dir)?;
 
         let base_partial = redoxer_dir().join("base.bin.partial");
-        Command::new("dd")
-            .arg("if=/dev/zero")
-            .arg(format!("of={}", base_partial.display()))
-            .arg("bs=1M")
-            .arg("count=256")
+        Command::new("truncate")
+            .arg("--size=4G")
+            .arg(&base_partial)
             .status()
             .and_then(status_error)?;
 
@@ -303,7 +301,11 @@ fn inner() -> io::Result<i32> {
 
     let code = {
         let redoxer_bin = tempdir.path().join("redoxer.bin");
-        fs::copy(&base_bin, &redoxer_bin)?;
+        Command::new("cp")
+            .arg(&base_bin)
+            .arg(&redoxer_bin)
+            .status()
+            .and_then(status_error)?;
 
         let redoxer_dir = tempdir.path().join("redoxer");
         fs::create_dir_all(&redoxer_dir)?;
