@@ -1,6 +1,6 @@
 [package]
 name = "redoxer"
-version = "0.1.1"
+version = "0.1.2"
 description = "Method for quickly running programs inside of Redox from a KVM capable OS."
 license = "MIT"
 authors = ["Jeremy Soller <jeremy@system76.com>"]
