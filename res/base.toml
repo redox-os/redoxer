@@ -7,6 +7,7 @@ prompt = false
 [packages]
 ca-certificates = {}
 coreutils = {}
+dash = {}
 drivers = {}
 extrautils = {}
 findutils = {}
@@ -40,15 +41,15 @@ randd
 ipcd
 logd
 ptyd
-# pcid /etc/pcid/filesystem.toml
+pcid /etc/pcid/filesystem.toml
 """
 
 [[files]]
 path = "/etc/init.d/10_net"
 data = """
-# smolnetd
-# dnsd
-# dhcpd
+smolnetd
+dnsd
+dhcpd
 """
 
 [[files]]
