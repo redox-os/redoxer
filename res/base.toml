@@ -55,6 +55,19 @@ dhcpd
 [[files]]
 path = "/etc/init.d/20_redoxer"
 data = """
+echo
+echo ## preparing environment ##
+export GROUPS 0
+export HOME file:/root
+export HOST redox
+export SHELL file:/bin/sh
+export UID 0
+export USER root
+cd file:/root
+env
+
+echo
+echo ## running redoxer ##
 redoxerd
 """
 
