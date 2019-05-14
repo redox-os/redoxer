@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::{self, Command, ExitStatus, Stdio};
 
 static BASE_TOML: &'static str = include_str!("../res/base.toml");
+static TOOLCHAIN_ENV: &'static str = include_str!("../res/toolchain.env");
 
 pub struct RedoxFs {
     image: PathBuf,
@@ -236,22 +237,22 @@ fn shasum<P: AsRef<Path>>(path: P) -> io::Result<bool> {
 }
 
 //TODO: Rewrite with hyper or reqwest, tar-rs, sha2, and some gzip crate?
-fn prefix() -> io::Result<PathBuf> {
+fn toolchain() -> io::Result<PathBuf> {
     let url = "https://static.redox-os.org/toolchain/x86_64-unknown-redox";
     let toolchain_dir = redoxer_dir().join("toolchain");
-    let prefix_dir = toolchain_dir.join("prefix");
-    if ! prefix_dir.is_dir() {
-        println!("redoxer: building prefix");
+    if ! toolchain_dir.is_dir() {
+        println!("redoxer: building toolchain");
 
-        if toolchain_dir.is_dir() {
-            fs::remove_dir_all(&toolchain_dir)?;
+        let toolchain_partial = redoxer_dir().join("toolchain.partial");
+        if toolchain_partial.is_dir() {
+            fs::remove_dir_all(&toolchain_partial)?;
         }
-        fs::create_dir_all(&toolchain_dir)?;
+        fs::create_dir_all(&toolchain_partial)?;
 
-        let shasum_file = toolchain_dir.join("SHA256SUM");
+        let shasum_file = toolchain_partial.join("SHA256SUM");
         download(&format!("{}/SHA256SUM", url), &shasum_file)?;
 
-        let prefix_tar = toolchain_dir.join("relibc-install.tar.gz");
+        let prefix_tar = toolchain_partial.join("relibc-install.tar.gz");
         download(&format!("{}/relibc-install.tar.gz", url), &prefix_tar)?;
 
         if ! shasum(&shasum_file)? {
@@ -261,21 +262,63 @@ fn prefix() -> io::Result<PathBuf> {
             ));
         }
 
-        let prefix_partial = redoxer_dir().join("prefix.partial");
-        fs::create_dir_all(&prefix_partial)?;
-
         Command::new("tar")
             .arg("--extract")
             .arg("--file").arg(&prefix_tar)
-            .arg("-C").arg(&prefix_partial)
+            .arg("-C").arg(&toolchain_partial)
             .arg(".")
             .status()
             .and_then(status_error)?;
 
-        fs::rename(&prefix_partial, &prefix_dir)?;
+        let rust_tar = toolchain_partial.join("rust.tar.gz");
+        let rust_branch = "redox-2019-04-06";
+        download(
+            &format!(
+                "https://gitlab.redox-os.org/redox-os/rust/-/archive/{}/rust-{}.tar.gz",
+                rust_branch,
+                rust_branch
+            ),
+            &rust_tar
+        )?;
+
+        let rust_dir = toolchain_partial.join("rust");
+        fs::create_dir_all(&rust_dir)?;
+        Command::new("tar")
+            .arg("--extract")
+            .arg("--file").arg(&rust_tar)
+            .arg("-C").arg(&rust_dir)
+            .arg("--strip-components=1")
+            .arg(&format!("rust-{}", rust_branch))
+            .status()
+            .and_then(status_error)?;
+
+        let stdsimd_tar = toolchain_partial.join("stdsimd.tar.gz");
+        let stdsimd_branch = "2792b45c975880038240d477adb0d66f760ac048";
+        download(
+            &format!(
+                "https://codeload.github.com/rust-lang-nursery/stdsimd/tar.gz/{}",
+                stdsimd_branch
+            ),
+            &stdsimd_tar
+        )?;
+
+        let stdsimd_dir = rust_dir.join("src/stdsimd");
+        fs::create_dir_all(&stdsimd_dir)?;
+        Command::new("tar")
+            .arg("--extract")
+            .arg("--file").arg(&stdsimd_tar)
+            .arg("-C").arg(&stdsimd_dir)
+            .arg("--strip-components=1")
+            .arg(&format!("stdsimd-{}", stdsimd_branch))
+            .status()
+            .and_then(status_error)?;
+
+        fs::write(toolchain_partial.join("env"), TOOLCHAIN_ENV)?;
+
+        fs::rename(&toolchain_partial, &toolchain_dir)?;
     }
 
-    Ok(prefix_dir)
+    Ok(toolchain_dir)
 }
 
 fn inner(arguments: &[String], folder_opt: Option<String>) -> io::Result<i32> {
@@ -295,7 +338,7 @@ fn inner(arguments: &[String], folder_opt: Option<String>) -> io::Result<i32> {
 
     let bootloader_bin = bootloader()?;
     let base_bin = base(&bootloader_bin)?;
-    let prefix_dir = prefix()?;
+    let _toolchain_dir = toolchain()?;
 
     let tempdir = tempfile::tempdir()?;
 
