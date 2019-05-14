@@ -278,7 +278,7 @@ fn prefix() -> io::Result<PathBuf> {
     Ok(prefix_dir)
 }
 
-fn inner() -> io::Result<i32> {
+fn inner(arguments: &[String], folder_opt: Option<String>) -> io::Result<i32> {
     if ! installed("kvm")? {
         eprintln!("redoxer: kvm not found, please install before continuing");
         process::exit(1);
@@ -314,21 +314,26 @@ fn inner() -> io::Result<i32> {
             let mut redoxfs = RedoxFs::new(&redoxer_bin, &redoxer_dir)?;
 
             let mut redoxerd_config = String::new();
-            for (i, arg) in env::args().skip(1).enumerate() {
-                if i == 0 && arg.contains("/") {
-                    let name = arg.split("/").last().unwrap();
-                    fs::copy(
-                        &arg,
-                        redoxer_dir.join("bin").join(name)
-                    )?;
-                    redoxerd_config.push_str(&name);
-                    redoxerd_config.push('\n');
-                } else {
-                    redoxerd_config.push_str(&arg);
-                    redoxerd_config.push('\n');
-                }
+            for arg in arguments.iter() {
+                redoxerd_config.push_str(&arg);
+                redoxerd_config.push('\n');
             }
             fs::write(redoxer_dir.join("etc/redoxerd"), redoxerd_config)?;
+
+            if let Some(folder) = folder_opt {
+                eprintln!("redoxer: copying '{}' to '/root'", folder);
+
+                let root_dir = redoxer_dir.join("root");
+                Command::new("cp")
+                    .arg("--dereference")
+                    .arg("--no-target-directory")
+                    .arg("--preserve=mode,timestamps")
+                    .arg("--recursive")
+                    .arg(&folder)
+                    .arg(&root_dir)
+                    .status()
+                    .and_then(status_error)?;
+            }
 
             redoxfs.unmount()?;
         }
@@ -377,8 +382,49 @@ fn inner() -> io::Result<i32> {
     Ok(code)
 }
 
+fn usage() {
+    eprintln!("redoxer [-f|--folder folder] [--] <command> [arguments]...");
+    process::exit(1);
+}
+
 fn main() {
-    match inner() {
+    // Matching flags
+    let mut matching = true;
+    // Folder to copy
+    let mut folder_opt = None;
+    // Arguments to pass to command
+    let mut arguments = Vec::new();
+
+    let mut args = env::args().skip(1);
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "-f" | "--folder" if matching => match args.next() {
+                Some(folder) => {
+                    folder_opt = Some(folder);
+                },
+                None => {
+                    usage();
+                },
+            },
+            "-h" | "--help" if matching => {
+                usage();
+            },
+            //TODO: "-p" | "--package"
+            "--" if matching => {
+                matching = false;
+            }
+            _ => {
+                matching = false;
+                arguments.push(arg);
+            }
+        }
+    }
+
+    if arguments.is_empty() {
+        usage();
+    }
+
+    match inner(&arguments, folder_opt) {
         Ok(code) => {
             process::exit(code);
         },
