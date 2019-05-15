@@ -113,12 +113,29 @@ fn inner(arguments: &[String], folder_opt: Option<String>) -> io::Result<i32> {
 
             let mut redoxerd_config = String::new();
             for arg in arguments.iter() {
+                // Replace absolute path to folder with /root in command name
+                // TODO: make this activated by a flag
+                if let Some(ref folder) = folder_opt {
+                    let folder_canonical_path = fs::canonicalize(&folder)?;
+                    let folder_canonical = folder_canonical_path.to_str().ok_or(io::Error::new(
+                        io::ErrorKind::Other,
+                        "folder path is not valid UTF-8"
+                    ))?;
+                    if arg.starts_with(&folder_canonical) {
+                        let arg_replace = arg.replace(folder_canonical, "/root");
+                        eprintln!("redoxer: replacing '{}' with '{}' in arguments", arg, arg_replace);
+                        redoxerd_config.push_str(&arg_replace);
+                        redoxerd_config.push('\n');
+                        continue;
+                    }
+                }
+
                 redoxerd_config.push_str(&arg);
                 redoxerd_config.push('\n');
             }
             fs::write(redoxer_dir.join("etc/redoxerd"), redoxerd_config)?;
 
-            if let Some(folder) = folder_opt {
+            if let Some(ref folder) = folder_opt {
                 eprintln!("redoxer: copying '{}' to '/root'", folder);
 
                 let root_dir = redoxer_dir.join("root");
@@ -204,10 +221,11 @@ pub fn main() {
                     usage();
                 },
             },
+            // TODO: argument for replacing the folder path with /root when found in arguments
             "-h" | "--help" if matching => {
                 usage();
             },
-            //TODO: "-p" | "--package"
+            // TODO: "-p" | "--package"
             "--" if matching => {
                 matching = false;
             }

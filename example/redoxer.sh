@@ -8,4 +8,4 @@ function redoxer {
 	cargo run --release --manifest-path "${redoxer_manifest}" -- "$@"
 }
 
-redoxer run --release
+redoxer "$@"
