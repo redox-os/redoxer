@@ -45,20 +45,30 @@ fn status_error(status: process::ExitStatus) -> io::Result<()> {
 }
 
 fn usage() {
-    eprintln!("redoxer build - build with cargo");
-    eprintln!("redoxer exec - execute a command");
+    eprintln!("redoxer bench - cargo bench with Redox target in Redox VM");
+    eprintln!("redoxer build - cargo build with Redox target");
+    eprintln!("redoxer check - cargo check with Redox target");
+    eprintln!("redoxer doc - cargo doc with Redox target");
+    eprintln!("redoxer exec - execute a command in Redox VM");
     eprintln!("redoxer install - install toolchain");
+    eprintln!("redoxer run - cargo run with Redox target in Redox VM");
+    eprintln!("redoxer rustc - cargo rustc with Redox target");
+    eprintln!("redoxer test - cargo test with Redox target in Redox VM");
     process::exit(1);
 }
 
 fn main() {
     match env::args().nth(1) {
         Some(arg) => match arg.as_str() {
-            "build" => cargo::main(),
+            "bench" |
+            "build" |
+            "check" |
+            "doc" |
+            "run" |
+            "rustc" |
+            "test" => cargo::main(),
             "exec" => exec::main(),
             "install" => install::main(),
-            "run" => cargo::main(),
-            "test" => cargo::main(),
             _ => usage(),
         },
         None => usage(),
