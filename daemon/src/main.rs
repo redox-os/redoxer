@@ -19,12 +19,17 @@ pub fn handle(event_file: &mut File, master_fd: RawFd, timeout_fd: RawFd, proces
         if event_id == master_fd {
             let mut packet = [0; 4096];
             loop {
+                // Read data from PTY master
                 let count = match syscall::read(master_fd as usize, &mut packet) {
                     Ok(0) => return Ok(false),
                     Ok(count) => count,
                     Err(ref err) if err.errno == syscall::EAGAIN => return Ok(true),
                     Err(err) => return Err(syscall_error(err)),
                 };
+
+                // Write data to stdout
+                syscall::write(1, &packet[1..count]).map_err(syscall_error)?;
+
                 for i in 1..count {
                     // Write byte to QEMU debugcon (Bochs compatible)
                     Pio::<u8>::new(0xe9).write(packet[i]);
