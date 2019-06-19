@@ -6,6 +6,7 @@ use crate::{installed, redoxer_dir, status_error};
 use crate::redoxfs::RedoxFs;
 
 static BASE_TOML: &'static str = include_str!("../res/base.toml");
+static GUI_TOML: &'static str = include_str!("../res/gui.toml");
 
 fn bootloader() -> io::Result<PathBuf> {
     let bootloader_bin = redoxer_dir().join("bootloader.bin");
@@ -33,18 +34,20 @@ fn bootloader() -> io::Result<PathBuf> {
     Ok(bootloader_bin)
 }
 
-fn base(bootloader_bin: &Path) -> io::Result<PathBuf> {
-    let base_bin = redoxer_dir().join("base.bin");
-    if ! base_bin.is_file() {
-        eprintln!("redoxer: building base");
+fn base(bootloader_bin: &Path, gui: bool) -> io::Result<PathBuf> {
+    let name = if gui { "gui" } else { "base" };
 
-        let base_dir = redoxer_dir().join("base");
+    let base_bin = redoxer_dir().join(format!("{}.bin", name));
+    if ! base_bin.is_file() {
+        eprintln!("redoxer: building {}", name);
+
+        let base_dir = redoxer_dir().join(name);
         if base_dir.is_dir() {
             fs::remove_dir_all(&base_dir)?;
         }
         fs::create_dir_all(&base_dir)?;
 
-        let base_partial = redoxer_dir().join("base.bin.partial");
+        let base_partial = redoxer_dir().join(format!("{}.bin.partial", name));
         Command::new("truncate")
             .arg("--size=4G")
             .arg(&base_partial)
@@ -60,7 +63,15 @@ fn base(bootloader_bin: &Path) -> io::Result<PathBuf> {
         {
             let mut redoxfs = RedoxFs::new(&base_partial, &base_dir)?;
 
-            let config: redox_installer::Config = toml::from_str(BASE_TOML).unwrap(); //TODO
+            let config: redox_installer::Config = toml::from_str(
+                if gui { GUI_TOML } else { BASE_TOML }
+            ).map_err(|err| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("{}", err)
+                )
+            })?;
+
             let cookbook: Option<&str> = None;
             redox_installer::install(config, &base_dir, cookbook).map_err(|err| {
                 io::Error::new(
@@ -77,7 +88,7 @@ fn base(bootloader_bin: &Path) -> io::Result<PathBuf> {
     Ok(base_bin)
 }
 
-fn inner(arguments: &[String], folder_opt: Option<String>) -> io::Result<i32> {
+fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Result<i32> {
     if ! installed("kvm")? {
         eprintln!("redoxer: kvm not found, please install before continuing");
         process::exit(1);
@@ -93,7 +104,7 @@ fn inner(arguments: &[String], folder_opt: Option<String>) -> io::Result<i32> {
     }
 
     let bootloader_bin = bootloader()?;
-    let base_bin = base(&bootloader_bin)?;
+    let base_bin = base(&bootloader_bin, gui)?;
 
     let tempdir = tempfile::tempdir()?;
 
@@ -154,7 +165,8 @@ fn inner(arguments: &[String], folder_opt: Option<String>) -> io::Result<i32> {
         }
 
         let redoxer_log = tempdir.path().join("redoxer.log");
-        let status = Command::new("kvm")
+        let mut command = Command::new("kvm");
+        command
             .arg("-cpu").arg("host")
             .arg("-machine").arg("q35")
             .arg("-m").arg("2048")
@@ -165,10 +177,14 @@ fn inner(arguments: &[String], folder_opt: Option<String>) -> io::Result<i32> {
             .arg("-device").arg("isa-debug-exit")
             .arg("-netdev").arg("user,id=net0")
             .arg("-device").arg("e1000,netdev=net0")
-            .arg("-nographic")
-            .arg("-vga").arg("none")
-            .arg("-drive").arg(format!("file={},format=raw", redoxer_bin.display()))
-            .status()?;
+            .arg("-drive").arg(format!("file={},format=raw", redoxer_bin.display()));
+        if ! gui {
+            command
+                .arg("-nographic")
+                .arg("-vga").arg("none");
+        }
+
+        let status = command.status()?;
 
         eprintln!();
 
@@ -198,7 +214,7 @@ fn inner(arguments: &[String], folder_opt: Option<String>) -> io::Result<i32> {
 }
 
 fn usage() {
-    eprintln!("redoxer exec [-f|--folder folder] [-h|--help] [--] <command> [arguments]...");
+    eprintln!("redoxer exec [-f|--folder folder] [-g|--gui] [-h|--help] [--] <command> [arguments]...");
     process::exit(1);
 }
 
@@ -207,6 +223,8 @@ pub fn main() {
     let mut matching = true;
     // Folder to copy
     let mut folder_opt = None;
+    // Run with GUI
+    let mut gui = false;
     // Arguments to pass to command
     let mut arguments = Vec::new();
 
@@ -220,6 +238,9 @@ pub fn main() {
                 None => {
                     usage();
                 },
+            },
+            "-g" | "--gui" if matching => {
+                gui = true;
             },
             // TODO: argument for replacing the folder path with /root when found in arguments
             "-h" | "--help" if matching => {
@@ -240,7 +261,7 @@ pub fn main() {
         usage();
     }
 
-    match inner(&arguments, folder_opt) {
+    match inner(&arguments, folder_opt, gui) {
         Ok(code) => {
             process::exit(code);
         },
