@@ -20,6 +20,7 @@ netutils = {}
 nulld = {}
 orbdata = {}
 orbital = {}
+pkgutils = {}
 ptyd = {}
 randd = {}
 redoxerd = {}
@@ -113,6 +114,10 @@ path = "/etc/net/mac"
 data = """
 54-52-00-ab-cd-ef
 """
+
+[[files]]
+path = "/etc/pkg.d/50_redox"
+data = "https://static.redox-os.org/pkg"
 
 [[files]]
 path = "/etc/group"
