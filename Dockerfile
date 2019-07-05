@@ -16,7 +16,14 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
 ENV PATH=/root/.cargo/bin:$PATH
 
 # Install redoxer
-RUN cargo install redoxer
+COPY . /root/redoxer
+RUN cargo install --path /root/redoxer
 
 # Install redoxer toolchain
 RUN redoxer install
+
+# Install qemu-system-x86_64 (for redoxer exec)
+RUN apt-get install -y -qq qemu-system-x86
+
+# Install redoxfs (for redoxer exec)
+RUN cargo install redoxfs

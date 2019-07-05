@@ -35,10 +35,11 @@ fn bootloader() -> io::Result<PathBuf> {
     Ok(bootloader_bin)
 }
 
-fn base(bootloader_bin: &Path, gui: bool) -> io::Result<PathBuf> {
+fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
     let name = if gui { "gui" } else { "base" };
+    let ext = if fuse { "bin" } else { "tar" };
 
-    let base_bin = redoxer_dir().join(format!("{}.bin", name));
+    let base_bin = redoxer_dir().join(format!("{}.{}", name, ext));
     if ! base_bin.is_file() {
         eprintln!("redoxer: building {}", name);
 
@@ -48,21 +49,28 @@ fn base(bootloader_bin: &Path, gui: bool) -> io::Result<PathBuf> {
         }
         fs::create_dir_all(&base_dir)?;
 
-        let base_partial = redoxer_dir().join(format!("{}.bin.partial", name));
-        Command::new("truncate")
-            .arg("--size=4G")
-            .arg(&base_partial)
-            .status()
-            .and_then(status_error)?;
+        let base_partial = redoxer_dir().join(format!("{}.{}.partial", name, ext));
 
-        Command::new("redoxfs-mkfs")
-            .arg(&base_partial)
-            .arg(&bootloader_bin)
-            .status()
-            .and_then(status_error)?;
+        if fuse {
+            Command::new("truncate")
+                .arg("--size=4G")
+                .arg(&base_partial)
+                .status()
+                .and_then(status_error)?;
+
+            Command::new("redoxfs-mkfs")
+                .arg(&base_partial)
+                .arg(&bootloader_bin)
+                .status()
+                .and_then(status_error)?;
+        }
 
         {
-            let mut redoxfs = RedoxFs::new(&base_partial, &base_dir)?;
+            let redoxfs_opt = if fuse {
+                Some(RedoxFs::new(&base_partial, &base_dir)?)
+            } else {
+                None
+            };
 
             let config: redox_installer::Config = toml::from_str(
                 if gui { GUI_TOML } else { BASE_TOML }
@@ -81,7 +89,20 @@ fn base(bootloader_bin: &Path, gui: bool) -> io::Result<PathBuf> {
                 )
             })?;
 
-            redoxfs.unmount()?;
+            if let Some(mut redoxfs) = redoxfs_opt {
+                redoxfs.unmount()?;
+            }
+        }
+
+        if ! fuse {
+            Command::new("tar")
+                .arg("-c")
+                .arg("-p")
+                .arg("-f").arg(&base_partial)
+                .arg("-C").arg(&base_dir)
+                .arg(".")
+                .status()
+                .and_then(status_error)?;
         }
 
         fs::rename(&base_partial, &base_bin)?;
@@ -90,8 +111,16 @@ fn base(bootloader_bin: &Path, gui: bool) -> io::Result<PathBuf> {
 }
 
 fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Result<i32> {
-    if ! installed("kvm")? {
-        eprintln!("redoxer: kvm not found, please install before continuing");
+    let fuse = Path::new("/dev/fuse").exists();
+    if ! fuse && ! installed("tar")? {
+        eprintln!("redoxer: tar not found, please install before continuing");
+        process::exit(1);
+    }
+
+    let kvm = Path::new("/dev/kvm").exists();
+
+    if ! installed("qemu-system-x86_64")? {
+        eprintln!("redoxer: qemu-system-x86 not found, please install before continuing");
         process::exit(1);
     }
 
@@ -105,23 +134,38 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Res
     }
 
     let bootloader_bin = bootloader()?;
-    let base_bin = base(&bootloader_bin, gui)?;
+    let base_bin = base(&bootloader_bin, gui, fuse)?;
 
     let tempdir = tempfile::tempdir()?;
 
     let code = {
         let redoxer_bin = tempdir.path().join("redoxer.bin");
-        Command::new("cp")
-            .arg(&base_bin)
-            .arg(&redoxer_bin)
-            .status()
-            .and_then(status_error)?;
+        if fuse {
+            Command::new("cp")
+                .arg(&base_bin)
+                .arg(&redoxer_bin)
+                .status()
+                .and_then(status_error)?;
+        }
 
         let redoxer_dir = tempdir.path().join("redoxer");
         fs::create_dir_all(&redoxer_dir)?;
 
         {
-            let mut redoxfs = RedoxFs::new(&redoxer_bin, &redoxer_dir)?;
+            let redoxfs_opt = if fuse {
+                Some(RedoxFs::new(&redoxer_bin, &redoxer_dir)?)
+            } else {
+                Command::new("tar")
+                    .arg("-x")
+                    .arg("-p")
+                    .arg("--same-owner")
+                    .arg("-f").arg(&base_bin)
+                    .arg("-C").arg(&redoxer_dir)
+                    .arg(".")
+                    .status()
+                    .and_then(status_error)?;
+                None
+            };
 
             let mut redoxerd_config = String::new();
             for arg in arguments.iter() {
@@ -162,7 +206,18 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Res
                     .and_then(status_error)?;
             }
 
-            redoxfs.unmount()?;
+            if let Some(mut redoxfs) = redoxfs_opt {
+                redoxfs.unmount()?;
+            }
+        }
+
+        if ! fuse {
+            Command::new("redoxfs-ar")
+                .arg(&redoxer_bin)
+                .arg(&redoxer_dir)
+                .arg(&bootloader_bin)
+                .status()
+                .and_then(status_error)?;
         }
 
         // Set default bootloader configuration
@@ -186,9 +241,9 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Res
         }
 
         let redoxer_log = tempdir.path().join("redoxer.log");
-        let mut command = Command::new("kvm");
+        let mut command = Command::new("qemu-system-x86_64");
         command
-            .arg("-cpu").arg("host")
+            .arg("-cpu").arg("max")
             .arg("-machine").arg("q35")
             .arg("-m").arg("2048")
             .arg("-smp").arg("4")
@@ -199,6 +254,10 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Res
             .arg("-netdev").arg("user,id=net0")
             .arg("-device").arg("e1000,netdev=net0")
             .arg("-drive").arg(format!("file={},format=raw", redoxer_bin.display()));
+        if kvm {
+            command
+                .arg("-accel").arg("kvm");
+        }
         if ! gui {
             command
                 .arg("-nographic")
