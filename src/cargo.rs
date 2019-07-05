@@ -11,15 +11,17 @@ fn inner() -> io::Result<()> {
 
     let linker = format!("{}-gcc", target);
 
-    let path = {
+    // PATH must be set first so cargo is sourced from the toolchain path
+    {
         let path = env::var_os("PATH").unwrap_or(OsString::new());
         let mut paths = env::split_paths(&path).collect::<Vec<_>>();
-        paths.push(toolchain_dir.join("bin"));
-        env::join_paths(paths).map_err(|err| io::Error::new(
+        paths.insert(0, toolchain_dir.join("bin"));
+        let new_path = env::join_paths(paths).map_err(|err| io::Error::new(
             io::ErrorKind::Other,
             err
-        ))?
-    };
+        ))?;
+        env::set_var("PATH", new_path);
+    }
 
     // TODO: Ensure no spaces in toolchain_dir
     let rustflags = format!(
@@ -62,7 +64,6 @@ fn inner() -> io::Result<()> {
         .args(arguments)
         .env("CARGO_TARGET_X86_64_UNKNOWN_REDOX_LINKER", linker)
         .env("CARGO_TARGET_X86_64_UNKNOWN_REDOX_RUNNER", runner)
-        .env("PATH", path)
         .env("RUSTFLAGS", rustflags)
         .env("RUSTUP_TOOLCHAIN", &toolchain_dir)
         .env("TARGET", &target)
@@ -78,7 +79,7 @@ pub fn main() {
             process::exit(0);
         },
         Err(err) => {
-            eprintln!("redoxer install: {}", err);
+            eprintln!("redoxer cargo: {}", err);
             process::exit(1);
         }
     }

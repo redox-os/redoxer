@@ -287,7 +287,7 @@ pub fn main() {
             process::exit(code);
         },
         Err(err) => {
-            eprintln!("redoxer: {}", err);
+            eprintln!("redoxer exec: {}", err);
             process::exit(3);
         }
     }
