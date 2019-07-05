@@ -6,7 +6,8 @@ RUN apt-get update -qq && \
       build-essential \
       curl \
       libfuse-dev \
-      pkg-config
+      pkg-config \
+      qemu-system-x86
 
 # Install rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
@@ -15,15 +16,12 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
 # Set path
 ENV PATH=/root/.cargo/bin:$PATH
 
+# Install redoxfs
+RUN cargo install redoxfs
+
 # Install redoxer
 COPY . /root/redoxer
 RUN cargo install --path /root/redoxer
 
 # Install redoxer toolchain
 RUN redoxer install
-
-# Install qemu-system-x86_64 (for redoxer exec)
-RUN apt-get install -y -qq qemu-system-x86
-
-# Install redoxfs (for redoxer exec)
-RUN cargo install redoxfs
