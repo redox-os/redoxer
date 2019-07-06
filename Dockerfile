@@ -5,6 +5,7 @@ RUN apt-get update -qq && \
     apt-get install -y -qq \
       build-essential \
       curl \
+      fuse \
       libfuse-dev \
       pkg-config \
       qemu-system-x86

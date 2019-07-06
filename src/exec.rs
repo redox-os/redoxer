@@ -147,24 +147,25 @@ fn archive_free_space(disk_path: &Path, folder_path: &Path, bootloader_path: &Pa
 
 fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Result<i32> {
     let kvm = Path::new("/dev/kvm").exists();
-
     if ! installed("qemu-system-x86_64")? {
         eprintln!("redoxer: qemu-system-x86 not found, please install before continuing");
         process::exit(1);
     }
 
     let fuse = Path::new("/dev/fuse").exists();
-    if ! fuse && ! installed("tar")? {
+    if fuse {
+        if ! installed("fusermount")? {
+            eprintln!("redoxer: fuse not found, please install before continuing");
+            process::exit(1);
+        }
+
+        if ! installed("redoxfs")? {
+            eprintln!("redoxer: redoxfs not found, please install before continuing");
+            process::exit(1);
+        }
+    } else if ! installed("tar")? {
         eprintln!("redoxer: tar not found, please install before continuing");
         process::exit(1);
-    }
-    if fuse && ! installed("redoxfs")? {
-        eprintln!("redoxer: redoxfs not found, installing with cargo");
-        Command::new("cargo")
-            .arg("install")
-            .arg("redoxfs")
-            .status()
-            .and_then(status_error)?;
     }
 
     let bootloader_bin = bootloader()?;
