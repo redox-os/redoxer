@@ -1,9 +1,11 @@
+use redoxfs::{archive_at, BLOCK_SIZE, DiskSparse, FileSystem};
 use std::{env, fs, io};
 use std::io::{Seek, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::{installed, redoxer_dir, status_error};
+use crate::{installed, redoxer_dir, status_error, syscall_error};
 use crate::redoxfs::RedoxFs;
 
 static BASE_TOML: &'static str = include_str!("../res/base.toml");
@@ -110,13 +112,40 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
     Ok(base_bin)
 }
 
-fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Result<i32> {
-    let fuse = Path::new("/dev/fuse").exists();
-    if ! fuse && ! installed("tar")? {
-        eprintln!("redoxer: tar not found, please install before continuing");
-        process::exit(1);
-    }
+fn archive_free_space(disk_path: &Path, folder_path: &Path, bootloader_path: &Path, free_space: u64) -> io::Result<()> {
+    let disk = DiskSparse::create(&disk_path).map_err(syscall_error)?;
 
+    let bootloader = fs::read(bootloader_path)?;
+
+    let ctime = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+    let mut fs = FileSystem::create_reserved(
+        disk,
+        &bootloader,
+        ctime.as_secs(),
+        ctime.subsec_nanos()
+    ).map_err(syscall_error)?;
+
+    let root_block = fs.header.1.root;
+    archive_at(&mut fs, folder_path, root_block)?;
+
+    let free_block = fs.header.1.free;
+    let mut free = fs.node(free_block).map_err(syscall_error)?;
+    let end_block = free.1.extents[0].block;
+    free.1.extents[0].length = free_space;
+    let end_size = end_block * BLOCK_SIZE + free.1.extents[0].length;
+    fs.write_at(free.0, &free.1).map_err(syscall_error)?;
+
+    fs.header.1.size = end_size;
+    let header = fs.header;
+    fs.write_at(header.0, &header.1).map_err(syscall_error)?;
+
+    let size = header.0 * BLOCK_SIZE + end_size;
+    fs.disk.file.set_len(size)?;
+
+    Ok(())
+}
+
+fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Result<i32> {
     let kvm = Path::new("/dev/kvm").exists();
 
     if ! installed("qemu-system-x86_64")? {
@@ -124,7 +153,12 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Res
         process::exit(1);
     }
 
-    if ! installed("redoxfs")? {
+    let fuse = Path::new("/dev/fuse").exists();
+    if ! fuse && ! installed("tar")? {
+        eprintln!("redoxer: tar not found, please install before continuing");
+        process::exit(1);
+    }
+    if fuse && ! installed("redoxfs")? {
         eprintln!("redoxer: redoxfs not found, installing with cargo");
         Command::new("cargo")
             .arg("install")
@@ -212,12 +246,12 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Res
         }
 
         if ! fuse {
-            Command::new("redoxfs-ar")
-                .arg(&redoxer_bin)
-                .arg(&redoxer_dir)
-                .arg(&bootloader_bin)
-                .status()
-                .and_then(status_error)?;
+            archive_free_space(
+                &redoxer_bin,
+                &redoxer_dir,
+                &bootloader_bin,
+                1024 * 1024 * 1024
+            )?;
         }
 
         // Set default bootloader configuration

@@ -44,6 +44,10 @@ fn status_error(status: process::ExitStatus) -> io::Result<()> {
     }
 }
 
+fn syscall_error(err: syscall::Error) -> io::Error {
+    io::Error::from_raw_os_error(err.errno)
+}
+
 fn usage() {
     eprintln!("redoxer bench - cargo bench with Redox target in Redox VM");
     eprintln!("redoxer build - cargo build with Redox target");
