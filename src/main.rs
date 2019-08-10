@@ -55,6 +55,7 @@ fn usage() {
     eprintln!("redoxer doc - cargo doc with Redox target");
     eprintln!("redoxer exec - execute a command in Redox VM");
     eprintln!("redoxer install - install toolchain");
+    eprintln!("redoxer trace - trace a cargo binary with Redox target in Redox VM");
     eprintln!("redoxer run - cargo run with Redox target in Redox VM");
     eprintln!("redoxer rustc - cargo rustc with Redox target");
     eprintln!("redoxer test - cargo test with Redox target in Redox VM");
@@ -68,6 +69,7 @@ fn main() {
             "build" |
             "check" |
             "doc" |
+            "trace" |
             "run" |
             "rustc" |
             "test" => cargo::main(),

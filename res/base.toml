@@ -5,6 +5,7 @@ prompt = false
 
 # Package settings
 [packages]
+strace = {}
 ca-certificates = {}
 coreutils = {}
 dash = {}

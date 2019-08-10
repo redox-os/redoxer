@@ -31,7 +31,7 @@ fn inner() -> io::Result<()> {
 
     let mut args = env::args();
     let command = args.next().unwrap();
-    let subcommand = args.next().unwrap();
+    let mut subcommand = args.next().unwrap();
 
     let mut arguments = Vec::new();
     let mut matching = true;
@@ -51,11 +51,19 @@ fn inner() -> io::Result<()> {
         }
     }
 
+    let trace = if subcommand == "trace" {
+        subcommand = "run".into();
+        true
+    } else {
+        false
+    };
+
     // TODO: Ensure no spaces in command
     let runner = format!(
-        "{} exec --folder .{}",
+        "{} exec --folder .{}{}",
         command,
-        if gui { " --gui" } else { "" }
+        if gui { " --gui" } else { "" },
+        if trace { " /usr/bin/env PATH=/bin;. strace --" } else { "" },
     );
 
     Command::new("cargo")
