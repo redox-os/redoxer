@@ -17,12 +17,15 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
 # Set path
 ENV PATH=/root/.cargo/bin:$PATH
 
-# Install redoxfs
-RUN cargo install redoxfs
-
 # Install redoxer
 COPY . /root/redoxer
 RUN cargo install --path /root/redoxer
 
+# Install redoxfs
+RUN cargo install redoxfs
+
 # Install redoxer toolchain
 RUN redoxer install
+
+# Run test application
+RUN redoxer exec true
