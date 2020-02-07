@@ -17,15 +17,12 @@ logd = {}
 netdb = {}
 netstack = {}
 netutils = {}
-nulld = {}
 orbdata = {}
 orbital = {}
 pkgutils = {}
 ptyd = {}
-randd = {}
 redoxerd = {}
 uutils = {}
-zerod = {}
 
 # User settings
 [users.root]
@@ -39,13 +36,10 @@ home = "/root"
 path = "/etc/init.d/00_base"
 data = """
 stdio debug:
-nulld
-zerod
-randd
 ipcd
 logd
 ptyd
-pcid /etc/pcid/filesystem.toml
+pcid /etc/pcid.d/
 """
 
 [[files]]
