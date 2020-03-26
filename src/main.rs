@@ -1,8 +1,9 @@
-use std::{env, io, path, process};
+use std::{env::args, io, path, process};
 
 pub (crate) use self::toolchain::toolchain;
 
 mod cargo;
+mod env;
 mod exec;
 mod install;
 mod redoxfs;
@@ -53,6 +54,7 @@ fn usage() {
     eprintln!("redoxer build - cargo build with Redox target");
     eprintln!("redoxer check - cargo check with Redox target");
     eprintln!("redoxer doc - cargo doc with Redox target");
+    eprintln!("redoxer env - execute a command in cross-compilation environment");
     eprintln!("redoxer exec - execute a command in Redox VM");
     eprintln!("redoxer install - install toolchain");
     eprintln!("redoxer run - cargo run with Redox target in Redox VM");
@@ -62,7 +64,7 @@ fn usage() {
 }
 
 fn main() {
-    match env::args().nth(1) {
+    match args().nth(1) {
         Some(arg) => match arg.as_str() {
             "bench" |
             "build" |
@@ -71,6 +73,7 @@ fn main() {
             "run" |
             "rustc" |
             "test" => cargo::main(),
+            "env" => env::main(),
             "exec" => exec::main(),
             "install" => install::main(),
             _ => usage(),

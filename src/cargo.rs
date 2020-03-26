@@ -1,6 +1,5 @@
 use std::{env, io, process};
 use std::ffi::OsString;
-use std::process::Command;
 
 use crate::{status_error, toolchain};
 
@@ -8,8 +7,6 @@ fn inner() -> io::Result<()> {
     let toolchain_dir = toolchain()?;
 
     let target = "x86_64-unknown-redox";
-
-    let linker = format!("{}-gcc", target);
 
     // PATH must be set first so cargo is sourced from the toolchain path
     {
@@ -43,11 +40,10 @@ fn inner() -> io::Result<()> {
             },
             "--" if matching => {
                 matching = false;
-                arguments.push(arg);
-            }
+            },
             _ => {
                 arguments.push(arg);
-            }
+            },
         }
     }
 
@@ -58,15 +54,12 @@ fn inner() -> io::Result<()> {
         if gui { " --gui" } else { "" }
     );
 
-    Command::new("cargo")
+    crate::env::command("cargo")?
         .arg(subcommand)
         .arg("--target").arg(target)
         .args(arguments)
-        .env("CARGO_TARGET_X86_64_UNKNOWN_REDOX_LINKER", linker)
         .env("CARGO_TARGET_X86_64_UNKNOWN_REDOX_RUNNER", runner)
         .env("RUSTFLAGS", rustflags)
-        .env("RUSTUP_TOOLCHAIN", &toolchain_dir)
-        .env("TARGET", &target)
         .status()
         .and_then(status_error)?;
 
