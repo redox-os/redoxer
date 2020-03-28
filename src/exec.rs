@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::{installed, redoxer_dir, status_error, syscall_error};
+use crate::{installed, redoxer_dir, status_error, syscall_error, toolchain, TARGET};
 use crate::redoxfs::RedoxFs;
 
 static BASE_TOML: &'static str = include_str!("../res/base.toml");
@@ -168,6 +168,7 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Res
         process::exit(1);
     }
 
+    let toolchain_dir = toolchain()?;
     let bootloader_bin = bootloader()?;
     let base_bin = base(&bootloader_bin, gui, fuse)?;
 
@@ -201,6 +202,27 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Res
                     .and_then(status_error)?;
                 None
             };
+
+            let toolchain_lib_dir = toolchain_dir.join(TARGET).join("lib");
+            let lib_dir = redoxer_dir.join("lib");
+            for obj in &[
+                "ld64.so.1",
+                "libc.so",
+                "libgcc_s.so",
+                "libgcc_s.so.1",
+                "libstdc++.so",
+                "libstdc++.so.6",
+                "libstdc++.so.6.0.25",
+            ] {
+                eprintln!("redoxer: copying '{}' to '/lib'", obj);
+
+                Command::new("cp")
+                    .arg("--preserve=mode,timestamps")
+                    .arg(&toolchain_lib_dir.join(obj))
+                    .arg(&lib_dir)
+                    .status()
+                    .and_then(status_error)?;
+            }
 
             let mut redoxerd_config = String::new();
             for arg in arguments.iter() {
