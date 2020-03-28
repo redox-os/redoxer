@@ -9,6 +9,8 @@ mod install;
 mod redoxfs;
 mod toolchain;
 
+static TARGET: &'static str = "x86_64-unknown-redox";
+
 //TODO: Confirm capabilities on other OSes
 #[cfg(target_os = "linux")]
 fn installed(program: &str) -> io::Result<bool> {

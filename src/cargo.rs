@@ -1,12 +1,10 @@
 use std::{env, io, process};
 use std::ffi::OsString;
 
-use crate::{status_error, toolchain};
+use crate::{status_error, toolchain, TARGET};
 
 fn inner() -> io::Result<()> {
     let toolchain_dir = toolchain()?;
-
-    let target = "x86_64-unknown-redox";
 
     // PATH must be set first so cargo is sourced from the toolchain path
     {
@@ -23,7 +21,7 @@ fn inner() -> io::Result<()> {
     // TODO: Ensure no spaces in toolchain_dir
     let rustflags = format!(
         "-L {}",
-        toolchain_dir.join(&target).join("lib").display()
+        toolchain_dir.join(TARGET).join("lib").display()
     );
 
     let mut args = env::args();
@@ -56,7 +54,7 @@ fn inner() -> io::Result<()> {
 
     crate::env::command("cargo")?
         .arg(subcommand)
-        .arg("--target").arg(target)
+        .arg("--target").arg(TARGET)
         .args(arguments)
         .env("CARGO_TARGET_X86_64_UNKNOWN_REDOX_RUNNER", runner)
         .env("RUSTFLAGS", rustflags)
