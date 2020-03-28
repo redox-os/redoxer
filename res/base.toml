@@ -20,6 +20,7 @@ netutils = {}
 pkgutils = {}
 ptyd = {}
 redoxerd = {}
+relibc = {}
 uutils = {}
 
 # User settings

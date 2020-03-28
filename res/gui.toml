@@ -22,6 +22,7 @@ orbital = {}
 pkgutils = {}
 ptyd = {}
 redoxerd = {}
+relibc = {}
 uutils = {}
 
 # User settings
