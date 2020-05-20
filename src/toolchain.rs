@@ -1,6 +1,6 @@
 use std::{fs, io};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{self, Command};
 
 use crate::{redoxer_dir, status_error, TARGET};
 
@@ -72,4 +72,16 @@ pub fn toolchain() -> io::Result<PathBuf> {
     }
 
     Ok(toolchain_dir)
+}
+
+pub fn main() {
+    match toolchain() {
+        Ok(_) => {
+            process::exit(0);
+        },
+        Err(err) => {
+            eprintln!("redoxer toolchain: {}", err);
+            process::exit(1);
+        }
+    }
 }

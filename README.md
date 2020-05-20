@@ -7,7 +7,7 @@ capable OS.
 cargo install redoxer
 
 ## Install redoxer toolchain
-redoxer install
+redoxer toolchain
 
 ## Build project with redoxer
 redoxer build

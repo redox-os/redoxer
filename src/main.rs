@@ -5,7 +5,6 @@ pub (crate) use self::toolchain::toolchain;
 mod cargo;
 mod env;
 mod exec;
-mod install;
 mod redoxfs;
 mod toolchain;
 
@@ -58,10 +57,11 @@ fn usage() {
     eprintln!("redoxer doc - cargo doc with Redox target");
     eprintln!("redoxer env - execute a command in cross-compilation environment");
     eprintln!("redoxer exec - execute a command in Redox VM");
-    eprintln!("redoxer install - install toolchain");
+    eprintln!("redoxer install - cargo install with Redox target");
     eprintln!("redoxer run - cargo run with Redox target in Redox VM");
     eprintln!("redoxer rustc - cargo rustc with Redox target");
     eprintln!("redoxer test - cargo test with Redox target in Redox VM");
+    eprintln!("redoxer toolchain - install toolchain");
     process::exit(1);
 }
 
@@ -72,12 +72,13 @@ fn main() {
             "build" |
             "check" |
             "doc" |
+            "install" |
             "run" |
             "rustc" |
             "test" => cargo::main(),
             "env" => env::main(),
             "exec" => exec::main(),
-            "install" => install::main(),
+            "toolchain" => toolchain::main(),
             _ => usage(),
         },
         None => usage(),

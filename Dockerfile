@@ -25,7 +25,7 @@ RUN cargo install --path /root/redoxer
 RUN cargo install redoxfs
 
 # Install redoxer toolchain
-RUN redoxer install
+RUN redoxer toolchain
 
 # Run test application
 RUN redoxer exec true

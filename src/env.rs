@@ -61,7 +61,7 @@ pub fn main() {
             process::exit(0);
         },
         Err(err) => {
-            eprintln!("redoxer install: {}", err);
+            eprintln!("redoxer env: {}", err);
             process::exit(1);
         }
     }
