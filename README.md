@@ -3,6 +3,9 @@
 Method for quickly building and running programs inside of Redox from a KVM
 capable OS.
 
+A pre-built docker image can be found on
+[Docker Hub](https://hub.docker.com/r/redoxos/redoxer)
+
 ## Install redoxer tool
 cargo install redoxer
 
