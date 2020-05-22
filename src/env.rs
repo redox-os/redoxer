@@ -34,10 +34,10 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> io::Result<process::Command>
     Ok(command)
 }
 
-fn inner() -> io::Result<()> {
+fn inner<I: Iterator<Item=String>>(args: I) -> io::Result<()> {
     let mut program_opt = None;
     let mut arguments = Vec::new();
-    for arg in env::args().skip(2) {
+    for arg in args.skip(2) {
         if program_opt.is_none() {
             program_opt = Some(arg);
         } else {
@@ -55,8 +55,8 @@ fn inner() -> io::Result<()> {
     Ok(())
 }
 
-pub fn main() {
-    match inner() {
+pub fn main(args: &[String]) {
+    match inner(args.iter().cloned()) {
         Ok(()) => {
             process::exit(0);
         },

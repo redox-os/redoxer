@@ -78,7 +78,7 @@ pub fn toolchain() -> io::Result<PathBuf> {
     Ok(toolchain_dir)
 }
 
-pub fn main() {
+pub fn main(_args: &[String]) {
     match toolchain() {
         Ok(_) => {
             process::exit(0);

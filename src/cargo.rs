@@ -3,7 +3,7 @@ use std::ffi::OsString;
 
 use crate::{status_error, toolchain, TARGET};
 
-fn inner() -> io::Result<()> {
+fn inner<I: Iterator<Item=String>>(mut args: I) -> io::Result<()> {
     let toolchain_dir = toolchain()?;
 
     // PATH must be set first so cargo is sourced from the toolchain path
@@ -24,7 +24,6 @@ fn inner() -> io::Result<()> {
         toolchain_dir.join(TARGET).join("lib").display()
     );
 
-    let mut args = env::args();
     let command = args.next().unwrap();
     let subcommand = args.next().unwrap();
 
@@ -64,8 +63,8 @@ fn inner() -> io::Result<()> {
     Ok(())
 }
 
-pub fn main() {
-    match inner() {
+pub fn main(args: &[String]) {
+    match inner(args.iter().cloned()) {
         Ok(()) => {
             process::exit(0);
         },

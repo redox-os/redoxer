@@ -1,5 +1,5 @@
 use redoxfs::{archive_at, BLOCK_SIZE, DiskSparse, FileSystem};
-use std::{env, fs, io};
+use std::{fs, io};
 use std::io::{Seek, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
@@ -355,7 +355,7 @@ fn usage() {
     process::exit(1);
 }
 
-pub fn main() {
+pub fn main(args: &[String]) {
     // Matching flags
     let mut matching = true;
     // Folder to copy
@@ -365,7 +365,7 @@ pub fn main() {
     // Arguments to pass to command
     let mut arguments = Vec::new();
 
-    let mut args = env::args().skip(2);
+    let mut args = args.iter().cloned().skip(2);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "-f" | "--folder" if matching => match args.next() {
