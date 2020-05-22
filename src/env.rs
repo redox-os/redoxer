@@ -35,20 +35,8 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> io::Result<process::Command>
 }
 
 fn inner<I: Iterator<Item=String>>(args: I) -> io::Result<()> {
-    let mut program_opt = None;
-    let mut arguments = Vec::new();
-    for arg in args.skip(2) {
-        if program_opt.is_none() {
-            program_opt = Some(arg);
-        } else {
-            arguments.push(arg);
-        }
-    }
-
-    //TODO: get user's default shell?
-    let program = program_opt.unwrap_or("bash".to_string());
-    command(program)?
-        .args(arguments)
+    command("env")?
+        .args(args)
         .status()
         .and_then(status_error)?;
 
@@ -56,7 +44,7 @@ fn inner<I: Iterator<Item=String>>(args: I) -> io::Result<()> {
 }
 
 pub fn main(args: &[String]) {
-    match inner(args.iter().cloned()) {
+    match inner(args.iter().cloned().skip(2)) {
         Ok(()) => {
             process::exit(0);
         },

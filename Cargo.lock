@@ -823,7 +823,7 @@ dependencies = [
 
 [[package]]
 name = "redoxer"
-version = "0.2.18"
+version = "0.2.19"
 dependencies = [
  "dirs 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-mounts 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
