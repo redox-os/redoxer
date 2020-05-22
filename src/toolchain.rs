@@ -1,4 +1,4 @@
-use std::{fs, io};
+use std::{env, fs, io};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 
@@ -36,6 +36,10 @@ fn shasum<P: AsRef<Path>>(path: P) -> io::Result<bool> {
 
 //TODO: Rewrite with hyper or reqwest, tar-rs, sha2, and some gzip crate?
 pub fn toolchain() -> io::Result<PathBuf> {
+    if let Ok(redoxer_toolchain) = env::var("REDOXER_TOOLCHAIN") {
+        return Ok(PathBuf::from(redoxer_toolchain));
+    }
+
     let url = format!("https://static.redox-os.org/toolchain/{}", TARGET);
     let toolchain_dir = redoxer_dir().join("toolchain");
     if ! toolchain_dir.is_dir() {
