@@ -20,8 +20,9 @@ fn inner<I: Iterator<Item=String>>(mut args: I) -> io::Result<()> {
 
     // TODO: Ensure no spaces in toolchain_dir
     let rustflags = format!(
-        "-L {}",
-        toolchain_dir.join(TARGET).join("lib").display()
+        "-L {} {}",
+        toolchain_dir.join(TARGET).join("lib").display(),
+        env::var("RUSTFLAGS").unwrap_or(String::new()),
     );
 
     let command = args.next().unwrap();
