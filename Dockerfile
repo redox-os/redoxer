@@ -1,7 +1,8 @@
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 
 # Install dependencies
-RUN apt-get update -qq && \
+RUN export DEBIAN_FRONTEND=noninteractive && \
+    apt-get update -qq && \
     apt-get install -y -qq \
       build-essential \
       curl \
