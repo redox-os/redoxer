@@ -8,7 +8,10 @@ mod exec;
 mod redoxfs;
 mod toolchain;
 
-static TARGET: &'static str = "x86_64-unknown-redox";
+const SUPPORTED_TARGETS: &'static [&'static str] = &[
+    "x86_64-unknown-redox",
+    "aarch64-unknown-redox"
+];
 
 //TODO: Confirm capabilities on other OSes
 #[cfg(target_os = "linux")]
@@ -63,6 +66,18 @@ fn usage() {
     eprintln!("redoxer test - cargo test with Redox target in Redox VM");
     eprintln!("redoxer toolchain - install toolchain");
     process::exit(1);
+}
+
+pub fn target() -> &'static str {
+    let target_from_env = std::env::var("TARGET").unwrap_or("".to_string());
+
+    let index = if SUPPORTED_TARGETS.contains(&&*target_from_env) == true {
+        SUPPORTED_TARGETS.iter().position(|t| **t == target_from_env).unwrap().into()
+    } else {
+        0usize
+    };
+
+    SUPPORTED_TARGETS[index]
 }
 
 pub fn main(args: &[String]) {

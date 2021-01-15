@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::{installed, redoxer_dir, status_error, syscall_error, toolchain, TARGET};
+use crate::{installed, redoxer_dir, status_error, syscall_error, toolchain, target};
 use crate::redoxfs::RedoxFs;
 
 static BASE_TOML: &'static str = include_str!("../res/base.toml");
@@ -203,7 +203,7 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Res
                 None
             };
 
-            let toolchain_lib_dir = toolchain_dir.join(TARGET).join("lib");
+            let toolchain_lib_dir = toolchain_dir.join(target()).join("lib");
             let lib_dir = redoxer_dir.join("lib");
             for obj in &[
                 "ld64.so.1",

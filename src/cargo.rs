@@ -1,7 +1,7 @@
 use std::{env, io, process};
 use std::ffi::OsString;
 
-use crate::{status_error, toolchain, TARGET};
+use crate::{status_error, toolchain, target};
 
 fn inner<I: Iterator<Item=String>>(mut args: I) -> io::Result<()> {
     let toolchain_dir = toolchain()?;
@@ -21,7 +21,7 @@ fn inner<I: Iterator<Item=String>>(mut args: I) -> io::Result<()> {
     // TODO: Ensure no spaces in toolchain_dir
     let rustflags = format!(
         "-L {}",
-        toolchain_dir.join(TARGET).join("lib").display()
+        toolchain_dir.join(target()).join("lib").display()
     );
 
     let command = args.next().unwrap();
@@ -53,7 +53,7 @@ fn inner<I: Iterator<Item=String>>(mut args: I) -> io::Result<()> {
 
     crate::env::command("cargo")?
         .arg(subcommand)
-        .arg("--target").arg(TARGET)
+        .arg("--target").arg(target())
         .args(arguments)
         .env("CARGO_TARGET_X86_64_UNKNOWN_REDOX_RUNNER", runner)
         .env("RUSTFLAGS", rustflags)
