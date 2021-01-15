@@ -10,7 +10,7 @@ edition = "2018"
 [dependencies]
 dirs = "2.0.2"
 redox_installer = "0.2.7"
-redox_syscall = "0.1.56"
+redox_syscall = "0.2"
 redoxfs = "0.4.1"
 tempfile = "3.1.0"
 toml = "0.5.6"
