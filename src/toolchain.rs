@@ -2,7 +2,7 @@ use std::{env, fs, io};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 
-use crate::{redoxer_dir, status_error, TARGET};
+use crate::{redoxer_dir, status_error, target};
 
 //TODO: Rewrite with hyper or reqwest, tar-rs, sha2, and some gzip crate?
 fn download<P: AsRef<Path>>(url: &str, path: P) -> io::Result<()> {
@@ -40,7 +40,7 @@ pub fn toolchain() -> io::Result<PathBuf> {
         return Ok(PathBuf::from(redoxer_toolchain));
     }
 
-    let url = format!("https://static.redox-os.org/toolchain/{}", TARGET);
+    let url = format!("https://static.redox-os.org/toolchain/{}", target());
     let toolchain_dir = redoxer_dir().join("toolchain");
     if ! toolchain_dir.is_dir() {
         println!("redoxer: building toolchain");

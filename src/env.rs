@@ -1,6 +1,6 @@
 use std::{env, ffi, io, process};
 
-use crate::{status_error, toolchain, TARGET};
+use crate::{status_error, toolchain, target};
 
 pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> io::Result<process::Command> {
     let toolchain_dir = toolchain()?;
@@ -17,10 +17,10 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> io::Result<process::Command>
         env::set_var("PATH", new_path);
     }
 
-    let ar = format!("{}-ar", TARGET);
-    let cc = format!("{}-gcc", TARGET);
-    let cxx = format!("{}-g++", TARGET);
-    let cc_target_var = TARGET.replace("-", "_");
+    let ar = format!("{}-ar", target());
+    let cc = format!("{}-gcc", target());
+    let cxx = format!("{}-g++", target());
+    let cc_target_var = target().replace("-", "_");
     let cargo_target_var = cc_target_var.to_uppercase();
 
     let mut command = process::Command::new(program);
@@ -29,7 +29,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> io::Result<process::Command>
     command.env(format!("CC_{}", cc_target_var), &cc);
     command.env(format!("CXX_{}", cc_target_var), &cxx);
     command.env("RUSTUP_TOOLCHAIN", &toolchain_dir);
-    command.env("TARGET", TARGET);
+    command.env("TARGET", target());
 
     Ok(command)
 }
