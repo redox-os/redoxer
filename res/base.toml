@@ -11,6 +11,8 @@ dash = {}
 drivers = {}
 extrautils = {}
 findutils = {}
+gcc = {}
+gnu-binutils = {}
 ipcd = {}
 kernel = {}
 logd = {}
@@ -20,6 +22,7 @@ netutils = {}
 pkgutils = {}
 ptyd = {}
 redoxerd = {}
+relibc = {}
 uutils = {}
 
 # User settings
