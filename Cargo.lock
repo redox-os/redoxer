@@ -993,7 +993,7 @@ dependencies = [
 
 [[package]]
 name = "redoxer"
-version = "0.2.20"
+version = "0.2.21"
 dependencies = [
  "dirs",
  "proc-mounts",

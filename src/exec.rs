@@ -145,7 +145,7 @@ fn archive_free_space(disk_path: &Path, folder_path: &Path, bootloader_path: &Pa
     Ok(())
 }
 
-fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Result<i32> {
+fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool, output_opt: Option<String>) -> io::Result<i32> {
     let kvm = Path::new("/dev/kvm").exists();
     if ! installed("qemu-system-x86_64")? {
         eprintln!("redoxer: qemu-system-x86 not found, please install before continuing");
@@ -340,7 +340,11 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Res
             }
         };
 
-        print!("{}", fs::read_to_string(&redoxer_log)?);
+        if let Some(output) = output_opt {
+            fs::copy(&redoxer_log, output)?;
+        } else {
+            print!("{}", fs::read_to_string(&redoxer_log)?);
+        }
 
         code
     };
@@ -351,7 +355,7 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool) -> io::Res
 }
 
 fn usage() {
-    eprintln!("redoxer exec [-f|--folder folder] [-g|--gui] [-h|--help] [--] <command> [arguments]...");
+    eprintln!("redoxer exec [-f|--folder folder] [-g|--gui] [-h|--help] [-o|--output file] [--] <command> [arguments]...");
     process::exit(1);
 }
 
@@ -362,6 +366,8 @@ pub fn main(args: &[String]) {
     let mut folder_opt = None;
     // Run with GUI
     let mut gui = false;
+    // File to put command output into
+    let mut output_opt = None;
     // Arguments to pass to command
     let mut arguments = Vec::new();
 
@@ -383,6 +389,14 @@ pub fn main(args: &[String]) {
             "-h" | "--help" if matching => {
                 usage();
             },
+            "-o" | "--output" if matching => match args.next() {
+                Some(output) => {
+                    output_opt = Some(output);
+                },
+                None => {
+                    usage();
+                },
+            },
             // TODO: "-p" | "--package"
             "--" if matching => {
                 matching = false;
@@ -398,7 +412,7 @@ pub fn main(args: &[String]) {
         usage();
     }
 
-    match inner(&arguments, folder_opt, gui) {
+    match inner(&arguments, folder_opt, gui, output_opt) {
         Ok(code) => {
             process::exit(code);
         },

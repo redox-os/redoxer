@@ -30,10 +30,19 @@ fn inner<I: Iterator<Item=String>>(mut args: I) -> io::Result<()> {
     let mut arguments = Vec::new();
     let mut matching = true;
     let mut gui = false;
+    let mut output_opt = None;
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "-g" | "--gui" if matching => {
                 gui = true;
+            },
+            "-o" | "--output" if matching => match args.next() {
+                Some(output) => {
+                    output_opt = Some(output);
+                },
+                None => {
+                    //TODO: usage();
+                },
             },
             "--" if matching => {
                 matching = false;
@@ -46,9 +55,13 @@ fn inner<I: Iterator<Item=String>>(mut args: I) -> io::Result<()> {
 
     // TODO: Ensure no spaces in command
     let runner = format!(
-        "{} exec --folder .{}",
+        "{} exec --folder .{}{}",
         command,
-        if gui { " --gui" } else { "" }
+        if gui { " --gui" } else { "" },
+        match output_opt {
+            Some(output) => format!(" --output {}", output),
+            None => String::new(),
+        }
     );
 
     crate::env::command("cargo")?
