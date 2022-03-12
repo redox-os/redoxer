@@ -39,11 +39,11 @@ impl RedoxFs {
         let fs = FileSystem::open(disk, None, None, true).map_err(syscall_error)?;
         let dir = self.dir.clone();
         thread::spawn(move || {
-            tx.send(redoxfs::mount(
+            let _ = tx.send(redoxfs::mount(
                 fs,
                 dir,
                 |_| {}
-            )).unwrap();
+            ));
         });
 
         while ! self.mounted()? {
