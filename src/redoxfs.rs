@@ -1,8 +1,10 @@
+use redoxfs::{DiskFile, FileSystem};
 use std::{fs, io, thread, time};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::mpsc::{channel, TryRecvError};
 
-use crate::{running, status_error};
+use crate::{status_error, syscall_error};
 
 pub struct RedoxFs {
     image: PathBuf,
@@ -31,18 +33,35 @@ impl RedoxFs {
             ));
         }
 
-        Command::new("redoxfs")
-            .arg(&self.image)
-            .arg(&self.dir)
-            .status()
-            .and_then(status_error)?;
+        let (tx, rx) = channel();
+
+        let disk = DiskFile::open(&self.image).map_err(syscall_error)?;
+        let fs = FileSystem::open(disk, None, None, true).map_err(syscall_error)?;
+        let dir = self.dir.clone();
+        thread::spawn(move || {
+            tx.send(redoxfs::mount(
+                fs,
+                dir,
+                |_| {}
+            )).unwrap();
+        });
 
         while ! self.mounted()? {
-            if ! running("redoxfs")? {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    "redoxfs process exited"
-                ));
+            match rx.try_recv() {
+                Ok(res) => match res {
+                    Ok(()) => return Err(io::Error::new(
+                        io::ErrorKind::NotConnected,
+                        "redoxfs thread exited early"
+                    )),
+                    Err(err) => return Err(err),
+                },
+                Err(err) => match err {
+                    TryRecvError::Empty => (),
+                    TryRecvError::Disconnected => return Err(io::Error::new(
+                        io::ErrorKind::NotConnected,
+                        "redoxfs thread did not send a result"
+                    )),
+                },
             }
             thread::sleep(time::Duration::from_millis(1));
         }

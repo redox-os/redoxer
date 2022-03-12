@@ -1,4 +1,4 @@
-use redoxfs::{archive_at, BLOCK_SIZE, DiskSparse, FileSystem};
+use redoxfs::{archive_at, BLOCK_SIZE, DiskSparse, FileSystem, TreePtr};
 use std::{fs, io};
 use std::io::{Seek, Write};
 use std::path::{Path, PathBuf};
@@ -54,17 +54,32 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
         let base_partial = redoxer_dir().join(format!("{}.{}.partial", name, ext));
 
         if fuse {
-            Command::new("truncate")
-                .arg("--size=4G")
-                .arg(&base_partial)
-                .status()
-                .and_then(status_error)?;
+            let disk_size = 1024 * 1024 * 1024;
+            let disk = DiskSparse::create(&base_partial, disk_size).map_err(syscall_error)?;
 
-            Command::new("redoxfs-mkfs")
-                .arg(&base_partial)
-                .arg(&bootloader_bin)
-                .status()
-                .and_then(status_error)?;
+            let bootloader = {
+                let mut bootloader = fs::read(bootloader_bin)?.to_vec();
+
+                // Pad bootloader to 1 MiB
+                while bootloader.len() < 1024 * 1024 {
+                    bootloader.push(0);
+                }
+
+                println!("{}", bootloader.len());
+
+                bootloader
+            };
+
+            let ctime = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+            let fs = FileSystem::create_reserved(
+                disk,
+                None,
+                &bootloader,
+                ctime.as_secs(),
+                ctime.subsec_nanos()
+            ).map_err(syscall_error)?;
+
+            fs.disk.file.set_len(disk_size)?;
         }
 
         {
@@ -113,33 +128,69 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
 }
 
 fn archive_free_space(disk_path: &Path, folder_path: &Path, bootloader_path: &Path, free_space: u64) -> io::Result<()> {
-    let disk = DiskSparse::create(&disk_path).map_err(syscall_error)?;
+    let disk = DiskSparse::create(&disk_path, free_space).map_err(syscall_error)?;
 
-    let bootloader = fs::read(bootloader_path)?;
+    let bootloader = {
+        let mut bootloader = fs::read(bootloader_path)?.to_vec();
+
+        // Pad bootloader to 1 MiB
+        while bootloader.len() < 1024 * 1024 {
+            bootloader.push(0);
+        }
+
+        println!("{}", bootloader.len());
+
+        bootloader
+    };
 
     let ctime = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
     let mut fs = FileSystem::create_reserved(
         disk,
+        None,
         &bootloader,
         ctime.as_secs(),
         ctime.subsec_nanos()
     ).map_err(syscall_error)?;
 
-    let root_block = fs.header.1.root;
-    archive_at(&mut fs, folder_path, root_block)?;
+    let end_block = fs
+        .tx(|tx| {
+            // Archive_at root node
+            archive_at(tx, folder_path, TreePtr::root())
+                .map_err(|err| syscall::Error::new(err.raw_os_error().unwrap()))?;
 
-    let free_block = fs.header.1.free;
-    let mut free = fs.node(free_block).map_err(syscall_error)?;
-    let end_block = free.1.extents[0].block;
-    free.1.extents[0].length = free_space;
-    let end_size = end_block * BLOCK_SIZE + free.1.extents[0].length;
-    fs.write_at(free.0, &free.1).map_err(syscall_error)?;
+            // Squash alloc log
+            tx.sync(true)?;
 
-    fs.header.1.size = end_size;
-    let header = fs.header;
-    fs.write_at(header.0, &header.1).map_err(syscall_error)?;
+            let mut end_block = tx.header.size() / BLOCK_SIZE;
+            /* TODO: Cut off any free blocks at the end of the filesystem
+            let mut end_changed = true;
+            while end_changed {
+                end_changed = false;
 
-    let size = header.0 * BLOCK_SIZE + end_size;
+                let allocator = fs.allocator();
+                let levels = allocator.levels();
+                for level in 0..levels.len() {
+                    let level_size = 1 << level;
+                    for &block in levels[level].iter() {
+                        if block < end_block && block + level_size >= end_block {
+                            end_block = block;
+                            end_changed = true;
+                        }
+                    }
+                }
+            }
+            */
+
+            // Update header
+            tx.header.size = (end_block * BLOCK_SIZE).into();
+            tx.header_changed = true;
+            tx.sync(false)?;
+
+            Ok(end_block)
+        })
+        .map_err(syscall_error)?;
+
+    let size = (fs.block + end_block) * BLOCK_SIZE;
     fs.disk.file.set_len(size)?;
 
     Ok(())
@@ -156,11 +207,6 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool, output_opt
     if fuse {
         if ! installed("fusermount")? {
             eprintln!("redoxer: fuse not found, please install before continuing");
-            process::exit(1);
-        }
-
-        if ! installed("redoxfs")? {
-            eprintln!("redoxer: redoxfs not found, please install before continuing");
             process::exit(1);
         }
     } else if ! installed("tar")? {

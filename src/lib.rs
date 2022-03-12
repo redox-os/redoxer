@@ -28,16 +28,6 @@ fn redoxer_dir() -> path::PathBuf {
         .join(".redoxer")
 }
 
-//TODO: Confirm capabilities on other OSes
-#[cfg(target_os = "linux")]
-fn running(program: &str) -> io::Result<bool> {
-    process::Command::new("pgrep")
-        .arg(program)
-        .stdout(process::Stdio::null())
-        .status()
-        .map(|x| x.success())
-}
-
 fn status_error(status: process::ExitStatus) -> io::Result<()> {
     if status.success() {
         Ok(())
