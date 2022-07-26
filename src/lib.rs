@@ -10,7 +10,8 @@ mod toolchain;
 
 const SUPPORTED_TARGETS: &'static [&'static str] = &[
     "x86_64-unknown-redox",
-    "aarch64-unknown-redox"
+    "aarch64-unknown-redox",
+    "i686-unknown-redox",
 ];
 
 //TODO: Confirm capabilities on other OSes
