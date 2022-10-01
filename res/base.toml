@@ -5,12 +5,15 @@ prompt = false
 
 # Package settings
 [packages]
+bootstrap = {}
 ca-certificates = {}
 coreutils = {}
 dash = {}
 drivers = {}
+escalated = {}
 extrautils = {}
 findutils = {}
+initfs = {}
 gcc = {}
 gnu-binutils = {}
 ipcd = {}
@@ -38,6 +41,7 @@ data = """
 ipcd
 ptyd
 pcid /etc/pcid.d/
+escalated
 """
 
 [[files]]

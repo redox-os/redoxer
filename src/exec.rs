@@ -32,7 +32,7 @@ fn bootloader() -> io::Result<PathBuf> {
             )
         })?;
 
-        fs::rename(&bootloader_dir.join("bootloader"), &bootloader_bin)?;
+        fs::rename(&bootloader_dir.join("boot/bootloader.bios"), &bootloader_bin)?;
     }
     Ok(bootloader_bin)
 }
@@ -60,8 +60,8 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
             let bootloader = {
                 let mut bootloader = fs::read(bootloader_bin)?.to_vec();
 
-                // Pad bootloader to 1 MiB
-                while bootloader.len() < 1024 * 1024 {
+                // Pad bootloader to 2 MiB
+                while bootloader.len() < 2 * 1024 * 1024 {
                     bootloader.push(0);
                 }
 
