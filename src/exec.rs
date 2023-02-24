@@ -1,19 +1,23 @@
-use redoxfs::{archive_at, BLOCK_SIZE, DiskSparse, FileSystem, TreePtr};
-use std::{fs, io};
+use redoxfs::{archive_at, DiskSparse, FileSystem, TreePtr, BLOCK_SIZE};
 use std::io::{Seek, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::{fs, io};
 
-use crate::{installed, redoxer_dir, status_error, syscall_error, toolchain, target};
 use crate::redoxfs::RedoxFs;
+use crate::{installed, redoxer_dir, status_error, syscall_error, target, toolchain};
 
 static BASE_TOML: &'static str = include_str!("../res/base.toml");
 static GUI_TOML: &'static str = include_str!("../res/gui.toml");
 
+/// Redoxer is used for testing out apps in redox OS environment.
+/// For this reason no live image is required
+const INSTALL_LIVE_IMAGE: bool = false;
+
 fn bootloader() -> io::Result<PathBuf> {
     let bootloader_bin = redoxer_dir().join("bootloader.bin");
-    if ! bootloader_bin.is_file() {
+    if !bootloader_bin.is_file() {
         eprintln!("redoxer: building bootloader");
 
         let bootloader_dir = redoxer_dir().join("bootloader");
@@ -23,16 +27,17 @@ fn bootloader() -> io::Result<PathBuf> {
         fs::create_dir_all(&bootloader_dir)?;
 
         let mut config = redox_installer::Config::default();
-        config.packages.insert("bootloader".to_string(), Default::default());
+        config
+            .packages
+            .insert("bootloader".to_string(), Default::default());
         let cookbook: Option<&str> = None;
-        redox_installer::install(config, &bootloader_dir, cookbook).map_err(|err| {
-            io::Error::new(
-                io::ErrorKind::Other,
-                format!("{}", err)
-            )
-        })?;
+        redox_installer::install(config, &bootloader_dir, cookbook, INSTALL_LIVE_IMAGE)
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
 
-        fs::rename(&bootloader_dir.join("boot/bootloader.bios"), &bootloader_bin)?;
+        fs::rename(
+            &bootloader_dir.join("boot/bootloader.bios"),
+            &bootloader_bin,
+        )?;
     }
     Ok(bootloader_bin)
 }
@@ -42,7 +47,7 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
     let ext = if fuse { "bin" } else { "tar" };
 
     let base_bin = redoxer_dir().join(format!("{}.{}", name, ext));
-    if ! base_bin.is_file() {
+    if !base_bin.is_file() {
         eprintln!("redoxer: building {}", name);
 
         let base_dir = redoxer_dir().join(name);
@@ -76,8 +81,9 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
                 None,
                 &bootloader,
                 ctime.as_secs(),
-                ctime.subsec_nanos()
-            ).map_err(syscall_error)?;
+                ctime.subsec_nanos(),
+            )
+            .map_err(syscall_error)?;
 
             fs.disk.file.set_len(disk_size)?;
         }
@@ -89,34 +95,27 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
                 None
             };
 
-            let config: redox_installer::Config = toml::from_str(
-                if gui { GUI_TOML } else { BASE_TOML }
-            ).map_err(|err| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("{}", err)
-                )
-            })?;
+            let config: redox_installer::Config =
+                toml::from_str(if gui { GUI_TOML } else { BASE_TOML })
+                    .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
 
             let cookbook: Option<&str> = None;
-            redox_installer::install(config, &base_dir, cookbook).map_err(|err| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("{}", err)
-                )
-            })?;
+            redox_installer::install(config, &base_dir, cookbook, INSTALL_LIVE_IMAGE)
+                .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
 
             if let Some(mut redoxfs) = redoxfs_opt {
                 redoxfs.unmount()?;
             }
         }
 
-        if ! fuse {
+        if !fuse {
             Command::new("tar")
                 .arg("-c")
                 .arg("-p")
-                .arg("-f").arg(&base_partial)
-                .arg("-C").arg(&base_dir)
+                .arg("-f")
+                .arg(&base_partial)
+                .arg("-C")
+                .arg(&base_dir)
                 .arg(".")
                 .status()
                 .and_then(status_error)?;
@@ -127,7 +126,12 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
     Ok(base_bin)
 }
 
-fn archive_free_space(disk_path: &Path, folder_path: &Path, bootloader_path: &Path, free_space: u64) -> io::Result<()> {
+fn archive_free_space(
+    disk_path: &Path,
+    folder_path: &Path,
+    bootloader_path: &Path,
+    free_space: u64,
+) -> io::Result<()> {
     let disk = DiskSparse::create(&disk_path, free_space).map_err(syscall_error)?;
 
     let bootloader = {
@@ -149,8 +153,9 @@ fn archive_free_space(disk_path: &Path, folder_path: &Path, bootloader_path: &Pa
         None,
         &bootloader,
         ctime.as_secs(),
-        ctime.subsec_nanos()
-    ).map_err(syscall_error)?;
+        ctime.subsec_nanos(),
+    )
+    .map_err(syscall_error)?;
 
     let end_block = fs
         .tx(|tx| {
@@ -196,20 +201,25 @@ fn archive_free_space(disk_path: &Path, folder_path: &Path, bootloader_path: &Pa
     Ok(())
 }
 
-fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool, output_opt: Option<String>) -> io::Result<i32> {
+fn inner(
+    arguments: &[String],
+    folder_opt: Option<String>,
+    gui: bool,
+    output_opt: Option<String>,
+) -> io::Result<i32> {
     let kvm = Path::new("/dev/kvm").exists();
-    if ! installed("qemu-system-x86_64")? {
+    if !installed("qemu-system-x86_64")? {
         eprintln!("redoxer: qemu-system-x86 not found, please install before continuing");
         process::exit(1);
     }
 
     let fuse = Path::new("/dev/fuse").exists();
     if fuse {
-        if ! installed("fusermount")? {
+        if !installed("fusermount")? {
             eprintln!("redoxer: fuse not found, please install before continuing");
             process::exit(1);
         }
-    } else if ! installed("tar")? {
+    } else if !installed("tar")? {
         eprintln!("redoxer: tar not found, please install before continuing");
         process::exit(1);
     }
@@ -241,8 +251,10 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool, output_opt
                     .arg("-x")
                     .arg("-p")
                     .arg("--same-owner")
-                    .arg("-f").arg(&base_bin)
-                    .arg("-C").arg(&redoxer_dir)
+                    .arg("-f")
+                    .arg(&base_bin)
+                    .arg("-C")
+                    .arg(&redoxer_dir)
                     .arg(".")
                     .status()
                     .and_then(status_error)?;
@@ -278,11 +290,14 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool, output_opt
                     let folder_canonical_path = fs::canonicalize(&folder)?;
                     let folder_canonical = folder_canonical_path.to_str().ok_or(io::Error::new(
                         io::ErrorKind::Other,
-                        "folder path is not valid UTF-8"
+                        "folder path is not valid UTF-8",
                     ))?;
                     if arg.starts_with(&folder_canonical) {
                         let arg_replace = arg.replace(folder_canonical, "/root");
-                        eprintln!("redoxer: replacing '{}' with '{}' in arguments", arg, arg_replace);
+                        eprintln!(
+                            "redoxer: replacing '{}' with '{}' in arguments",
+                            arg, arg_replace
+                        );
                         redoxerd_config.push_str(&arg_replace);
                         redoxerd_config.push('\n');
                         continue;
@@ -314,20 +329,18 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool, output_opt
             }
         }
 
-        if ! fuse {
+        if !fuse {
             archive_free_space(
                 &redoxer_bin,
                 &redoxer_dir,
                 &bootloader_bin,
-                1024 * 1024 * 1024
+                1024 * 1024 * 1024,
             )?;
         }
 
         // Set default bootloader configuration
         if gui {
-            let mut f = fs::OpenOptions::new()
-                .write(true)
-                .open(&redoxer_bin)?;
+            let mut f = fs::OpenOptions::new().write(true).open(&redoxer_bin)?;
 
             // Configuration is stored in the third sector
             f.seek(io::SeekFrom::Start(512 * 3))?;
@@ -346,25 +359,33 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool, output_opt
         let redoxer_log = tempdir.path().join("redoxer.log");
         let mut command = Command::new("qemu-system-x86_64");
         command
-            .arg("-cpu").arg("max")
-            .arg("-machine").arg("q35")
-            .arg("-m").arg("2048")
-            .arg("-smp").arg("4")
-            .arg("-serial").arg("mon:stdio")
-            .arg("-chardev").arg(format!("file,id=log,path={}", redoxer_log.display()))
-            .arg("-device").arg("isa-debugcon,chardev=log")
-            .arg("-device").arg("isa-debug-exit")
-            .arg("-netdev").arg("user,id=net0")
-            .arg("-device").arg("e1000,netdev=net0")
-            .arg("-drive").arg(format!("file={},format=raw", redoxer_bin.display()));
+            .arg("-cpu")
+            .arg("max")
+            .arg("-machine")
+            .arg("q35")
+            .arg("-m")
+            .arg("2048")
+            .arg("-smp")
+            .arg("4")
+            .arg("-serial")
+            .arg("mon:stdio")
+            .arg("-chardev")
+            .arg(format!("file,id=log,path={}", redoxer_log.display()))
+            .arg("-device")
+            .arg("isa-debugcon,chardev=log")
+            .arg("-device")
+            .arg("isa-debug-exit")
+            .arg("-netdev")
+            .arg("user,id=net0")
+            .arg("-device")
+            .arg("e1000,netdev=net0")
+            .arg("-drive")
+            .arg(format!("file={},format=raw", redoxer_bin.display()));
         if kvm {
-            command
-                .arg("-accel").arg("kvm");
+            command.arg("-accel").arg("kvm");
         }
-        if ! gui {
-            command
-                .arg("-nographic")
-                .arg("-vga").arg("none");
+        if !gui {
+            command.arg("-nographic").arg("-vga").arg("none");
         }
 
         let status = command.status()?;
@@ -375,11 +396,11 @@ fn inner(arguments: &[String], folder_opt: Option<String>, gui: bool, output_opt
             Some(51) => {
                 eprintln!("## redoxer (success) ##");
                 0
-            },
+            }
             Some(53) => {
                 eprintln!("## redoxer (failure) ##");
                 1
-            },
+            }
             _ => {
                 eprintln!("## redoxer (failure, qemu exit status {:?} ##", status);
                 2
@@ -423,25 +444,25 @@ pub fn main(args: &[String]) {
             "-f" | "--folder" if matching => match args.next() {
                 Some(folder) => {
                     folder_opt = Some(folder);
-                },
+                }
                 None => {
                     usage();
-                },
+                }
             },
             "-g" | "--gui" if matching => {
                 gui = true;
-            },
+            }
             // TODO: argument for replacing the folder path with /root when found in arguments
             "-h" | "--help" if matching => {
                 usage();
-            },
+            }
             "-o" | "--output" if matching => match args.next() {
                 Some(output) => {
                     output_opt = Some(output);
-                },
+                }
                 None => {
                     usage();
-                },
+                }
             },
             // TODO: "-p" | "--package"
             "--" if matching => {
@@ -461,7 +482,7 @@ pub fn main(args: &[String]) {
     match inner(&arguments, folder_opt, gui, output_opt) {
         Ok(code) => {
             process::exit(code);
-        },
+        }
         Err(err) => {
             eprintln!("redoxer exec: {}", err);
             process::exit(3);
