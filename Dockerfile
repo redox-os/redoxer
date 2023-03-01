@@ -1,4 +1,4 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 # Install dependencies
 RUN export DEBIAN_FRONTEND=noninteractive && \
@@ -22,11 +22,5 @@ ENV PATH=/root/.cargo/bin:$PATH
 COPY . /root/redoxer
 RUN cargo install --path /root/redoxer
 
-# Install redoxfs
-RUN cargo install redoxfs
-
 # Install redoxer toolchain
 RUN redoxer toolchain
-
-# Run test application
-RUN redoxer exec true
