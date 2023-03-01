@@ -1,16 +1,18 @@
-use std::{env, fs, io};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
+use std::{env, fs, io};
 
 use crate::{redoxer_dir, status_error, target};
 
 //TODO: Rewrite with hyper or reqwest, tar-rs, sha2, and some gzip crate?
 fn download<P: AsRef<Path>>(url: &str, path: P) -> io::Result<()> {
     Command::new("curl")
-        .arg("--proto").arg("=https")
+        .arg("--proto")
+        .arg("=https")
         .arg("--tlsv1.2")
         .arg("--fail")
-        .arg("--output").arg(path.as_ref())
+        .arg("--output")
+        .arg(path.as_ref())
         .arg(url)
         .status()
         .and_then(status_error)
@@ -18,12 +20,10 @@ fn download<P: AsRef<Path>>(url: &str, path: P) -> io::Result<()> {
 
 //TODO: Rewrite with hyper or reqwest, tar-rs, sha2, and some gzip crate?
 fn shasum<P: AsRef<Path>>(path: P) -> io::Result<bool> {
-    let parent = path.as_ref().parent().ok_or(
-        io::Error::new(
-            io::ErrorKind::Other,
-            "shasum path had no parent"
-        )
-    )?;
+    let parent = path.as_ref().parent().ok_or(io::Error::new(
+        io::ErrorKind::Other,
+        "shasum path had no parent",
+    ))?;
     Command::new("sha256sum")
         .arg("--check")
         .arg("--ignore-missing")
@@ -42,7 +42,7 @@ pub fn toolchain() -> io::Result<PathBuf> {
 
     let url = format!("https://static.redox-os.org/toolchain/{}", target());
     let toolchain_dir = redoxer_dir().join("toolchain");
-    if ! toolchain_dir.is_dir() {
+    if !toolchain_dir.is_dir() {
         println!("redoxer: building toolchain");
 
         let toolchain_partial = redoxer_dir().join("toolchain.partial");
@@ -57,17 +57,16 @@ pub fn toolchain() -> io::Result<PathBuf> {
         let prefix_tar = toolchain_partial.join("rust-install.tar.gz");
         download(&format!("{}/rust-install.tar.gz", url), &prefix_tar)?;
 
-        if ! shasum(&shasum_file)? {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "shasum invalid"
-            ));
+        if !shasum(&shasum_file)? {
+            return Err(io::Error::new(io::ErrorKind::Other, "shasum invalid"));
         }
 
         Command::new("tar")
             .arg("--extract")
-            .arg("--file").arg(&prefix_tar)
-            .arg("-C").arg(&toolchain_partial)
+            .arg("--file")
+            .arg(&prefix_tar)
+            .arg("-C")
+            .arg(&toolchain_partial)
             .arg(".")
             .status()
             .and_then(status_error)?;
@@ -82,7 +81,7 @@ pub fn main(_args: &[String]) {
     match toolchain() {
         Ok(_) => {
             process::exit(0);
-        },
+        }
         Err(err) => {
             eprintln!("redoxer toolchain: {}", err);
             process::exit(1);

@@ -1,6 +1,6 @@
 use std::{env, ffi, io, process};
 
-use crate::{status_error, toolchain, target};
+use crate::{status_error, target, toolchain};
 
 pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> io::Result<process::Command> {
     let toolchain_dir = toolchain()?;
@@ -10,10 +10,8 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> io::Result<process::Command>
         let path = env::var_os("PATH").unwrap_or(ffi::OsString::new());
         let mut paths = env::split_paths(&path).collect::<Vec<_>>();
         paths.insert(0, toolchain_dir.join("bin"));
-        let new_path = env::join_paths(paths).map_err(|err| io::Error::new(
-            io::ErrorKind::Other,
-            err
-        ))?;
+        let new_path =
+            env::join_paths(paths).map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
         env::set_var("PATH", new_path);
     }
 
@@ -34,11 +32,8 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> io::Result<process::Command>
     Ok(command)
 }
 
-fn inner<I: Iterator<Item=String>>(args: I) -> io::Result<()> {
-    command("env")?
-        .args(args)
-        .status()
-        .and_then(status_error)?;
+fn inner<I: Iterator<Item = String>>(args: I) -> io::Result<()> {
+    command("env")?.args(args).status().and_then(status_error)?;
 
     Ok(())
 }
@@ -47,7 +42,7 @@ pub fn main(args: &[String]) {
     match inner(args.iter().cloned().skip(2)) {
         Ok(()) => {
             process::exit(0);
-        },
+        }
         Err(err) => {
             eprintln!("redoxer env: {}", err);
             process::exit(1);

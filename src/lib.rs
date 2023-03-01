@@ -1,6 +1,6 @@
 use std::{io, path, process};
 
-pub (crate) use self::toolchain::toolchain;
+pub(crate) use self::toolchain::toolchain;
 
 mod cargo;
 mod env;
@@ -25,7 +25,8 @@ fn installed(program: &str) -> io::Result<bool> {
 }
 
 fn redoxer_dir() -> path::PathBuf {
-    dirs::home_dir().unwrap_or(path::PathBuf::from("."))
+    dirs::home_dir()
+        .unwrap_or(path::PathBuf::from("."))
         .join(".redoxer")
 }
 
@@ -33,10 +34,7 @@ fn status_error(status: process::ExitStatus) -> io::Result<()> {
     if status.success() {
         Ok(())
     } else {
-        Err(io::Error::new(
-            io::ErrorKind::Other,
-            format!("{}", status)
-        ))
+        Err(io::Error::new(io::ErrorKind::Other, format!("{}", status)))
     }
 }
 
@@ -63,7 +61,11 @@ pub fn target() -> &'static str {
     let target_from_env = std::env::var("TARGET").unwrap_or("".to_string());
 
     let index = if SUPPORTED_TARGETS.contains(&&*target_from_env) == true {
-        SUPPORTED_TARGETS.iter().position(|t| **t == target_from_env).unwrap().into()
+        SUPPORTED_TARGETS
+            .iter()
+            .position(|t| **t == target_from_env)
+            .unwrap()
+            .into()
     } else {
         0usize
     };
@@ -74,14 +76,9 @@ pub fn target() -> &'static str {
 pub fn main(args: &[String]) {
     match args.get(1) {
         Some(arg) => match arg.as_str() {
-            "bench" |
-            "build" |
-            "check" |
-            "doc" |
-            "install" |
-            "run" |
-            "rustc" |
-            "test" => cargo::main(args),
+            "bench" | "build" | "check" | "doc" | "install" | "run" | "rustc" | "test" => {
+                cargo::main(args)
+            }
             "env" => env::main(args),
             "exec" => exec::main(args),
             "toolchain" => toolchain::main(args),
