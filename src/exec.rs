@@ -1,5 +1,4 @@
 use redoxfs::{archive_at, DiskSparse, FileSystem, TreePtr, BLOCK_SIZE};
-use std::io::{Seek, Write};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -7,6 +6,9 @@ use std::{fs, io};
 
 use crate::redoxfs::RedoxFs;
 use crate::{installed, redoxer_dir, status_error, syscall_error, target, toolchain};
+
+const BOOTLOADER_SIZE: usize = 2 * 1024 * 1024;
+const DISK_SIZE: u64 = 1024 * 1024 * 1024;
 
 static BASE_TOML: &'static str = include_str!("../res/base.toml");
 static GUI_TOML: &'static str = include_str!("../res/gui.toml");
@@ -59,18 +61,15 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
         let base_partial = redoxer_dir().join(format!("{}.{}.partial", name, ext));
 
         if fuse {
-            let disk_size = 1024 * 1024 * 1024;
-            let disk = DiskSparse::create(&base_partial, disk_size).map_err(syscall_error)?;
+            let disk = DiskSparse::create(&base_partial, DISK_SIZE).map_err(syscall_error)?;
 
             let bootloader = {
                 let mut bootloader = fs::read(bootloader_bin)?.to_vec();
 
                 // Pad bootloader to 2 MiB
-                while bootloader.len() < 2 * 1024 * 1024 {
+                while bootloader.len() < BOOTLOADER_SIZE {
                     bootloader.push(0);
                 }
-
-                println!("{}", bootloader.len());
 
                 bootloader
             };
@@ -85,7 +84,7 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
             )
             .map_err(syscall_error)?;
 
-            fs.disk.file.set_len(disk_size)?;
+            fs.disk.file.set_len(DISK_SIZE)?;
         }
 
         {
@@ -137,12 +136,10 @@ fn archive_free_space(
     let bootloader = {
         let mut bootloader = fs::read(bootloader_path)?.to_vec();
 
-        // Pad bootloader to 1 MiB
-        while bootloader.len() < 1024 * 1024 {
+        // Pad bootloader to 2 MiB
+        while bootloader.len() < BOOTLOADER_SIZE {
             bootloader.push(0);
         }
-
-        println!("{}", bootloader.len());
 
         bootloader
     };
@@ -334,7 +331,7 @@ fn inner(
                 &redoxer_bin,
                 &redoxer_dir,
                 &bootloader_bin,
-                1024 * 1024 * 1024,
+                DISK_SIZE,
             )?;
         }
 
