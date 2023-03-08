@@ -338,24 +338,6 @@ fn inner(
             )?;
         }
 
-        // Set default bootloader configuration
-        if gui {
-            let mut f = fs::OpenOptions::new().write(true).open(&redoxer_bin)?;
-
-            // Configuration is stored in the third sector
-            f.seek(io::SeekFrom::Start(512 * 3))?;
-
-            // Width and height are stored as two u16 values
-            let width = 1024;
-            let height = 768;
-            f.write(&[
-                width as u8,
-                (width >> 8) as u8,
-                height as u8,
-                (height >> 8) as u8,
-            ])?;
-        }
-
         let redoxer_log = tempdir.path().join("redoxer.log");
         let mut command = Command::new("qemu-system-x86_64");
         command
