@@ -271,8 +271,8 @@ fn inner(
             ] {
                 eprintln!("redoxer: copying '{}' to '/lib'", obj);
 
-                Command::new("cp")
-                    .arg("--preserve=mode,timestamps")
+                Command::new("rsync")
+                    .arg("--archive")
                     .arg(&toolchain_lib_dir.join(obj))
                     .arg(&lib_dir)
                     .status()
@@ -310,11 +310,8 @@ fn inner(
                 eprintln!("redoxer: copying '{}' to '/root'", folder);
 
                 let root_dir = redoxer_dir.join("root");
-                Command::new("cp")
-                    .arg("--dereference")
-                    .arg("--no-target-directory")
-                    .arg("--preserve=mode,timestamps")
-                    .arg("--recursive")
+                Command::new("rsync")
+                    .arg("--archive")
                     .arg(&folder)
                     .arg(&root_dir)
                     .status()
