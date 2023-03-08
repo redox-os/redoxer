@@ -24,3 +24,6 @@ RUN cargo install --path /root/redoxer
 
 # Install redoxer toolchain
 RUN redoxer toolchain
+
+# Ensure redoxer exec is working
+RUN redoxer exec true
