@@ -1,1 +1,7 @@
+.dockerignore
+.git
+.gitignore
+Dockerfile
+daemon
+example
 target
