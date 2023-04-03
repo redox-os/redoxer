@@ -14,8 +14,6 @@ const SUPPORTED_TARGETS: &'static [&'static str] = &[
     "i686-unknown-redox",
 ];
 
-//TODO: Confirm capabilities on other OSes
-#[cfg(target_os = "linux")]
 fn installed(program: &str) -> io::Result<bool> {
     process::Command::new("which")
         .arg(program)
