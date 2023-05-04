@@ -67,7 +67,6 @@ pub fn toolchain() -> io::Result<PathBuf> {
             .arg(&prefix_tar)
             .arg("-C")
             .arg(&toolchain_partial)
-            .arg(".")
             .status()
             .and_then(status_error)?;
 
