@@ -1,25 +1,14 @@
 # redoxer
 
-Method for quickly building and running programs inside of Redox from a KVM
-capable OS.
+The tool used to build/run programs inside of a Redox VM, the Redox GitLab CI use a Docker image with `redoxer` pre-installed.
 
-A pre-built docker image can be found on
-[Docker Hub](https://hub.docker.com/r/redoxos/redoxer)
+A pre-built Docker image can be found on [Docker Hub](https://hub.docker.com/r/redoxos/redoxer)
 
-## Install redoxer tool
-cargo install redoxer
+## Commands
 
-## Install redoxer toolchain
-redoxer toolchain
-
-## Build project with redoxer
-redoxer build
-
-## Run project with redoxer (in redox!)
-redoxer run
-
-## Test project with redoxer (in redox!)
-redoxer test
-
-## Run arbitrary executable with redoxer (in redox!)
-redoxer exec echo hello
+- `cargo install redoxer` - install `redoxer` tool.
+- `redoxer toolchain` - install `redoxer` toolchain.
+- `redoxer build` - build project with `redoxer`.
+- `redoxer run` - run project with `redoxer`.
+- `redoxer test` - test project with `redoxer`.
+- `redoxer exec echo hello` - run arbitrary executable with `redoxer`.
