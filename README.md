@@ -1,6 +1,6 @@
 # redoxer
 
-The tool used to build/run programs inside of a Redox VM, the Redox GitLab CI use a Docker image with `redoxer` pre-installed.
+The tool used to build/run Rust programs (and C/C++ programs with zero dependencies) inside of a Redox VM, the Redox GitLab CI use a Docker image with `redoxer` pre-installed.
 
 A pre-built Docker image can be found on [Docker Hub](https://hub.docker.com/r/redoxos/redoxer)
 
