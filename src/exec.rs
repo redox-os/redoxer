@@ -267,7 +267,7 @@ fn inner(
                 "libgcc_s.so.1",
                 "libstdc++.so",
                 "libstdc++.so.6",
-                "libstdc++.so.6.0.25",
+                "libstdc++.so.6.0.32",
             ] {
                 eprintln!("redoxer: copying '{}' to '/lib'", obj);
 

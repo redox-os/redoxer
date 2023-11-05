@@ -9,7 +9,8 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
       fuse \
       libfuse-dev \
       pkg-config \
-      qemu-system-x86
+      qemu-system-x86 \
+      rsync
 
 # Install rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
