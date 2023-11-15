@@ -5,10 +5,10 @@ prompt = false
 
 # Package settings
 [packages]
+bash = {}
 bootstrap = {}
 ca-certificates = {}
 coreutils = {}
-dash = {}
 drivers = {}
 escalated = {}
 extrautils = {}
