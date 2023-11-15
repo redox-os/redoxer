@@ -58,29 +58,19 @@ dhcpd
 path = "/etc/init.d/20_redoxer"
 data = """
 echo
-echo ## running redoxer-env in orbital ##
-orbital display:3/activate sh /etc/redoxer-env
-"""
-
-[[files]]
-path = "/etc/redoxer-env"
-data = """
-#!/bin/sh
-
-echo
 echo ## preparing environment ##
-export GROUPS=0
-export HOME=file:/root
-export HOST=redox
-export SHELL=file:/bin/sh
-export UID=0
-export USER=root
+export GROUPS 0
+export HOME file:/root
+export HOST redox
+export SHELL file:/bin/sh
+export UID 0
+export USER root
 cd file:/root
 env
 
 echo
-echo ## running redoxer ##
-exec redoxerd
+echo ## running redoxer in orbital ##
+orbital redoxerd
 """
 
 [[files]]
