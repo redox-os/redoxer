@@ -1325,7 +1325,7 @@ dependencies = [
 
 [[package]]
 name = "redoxer"
-version = "0.2.34"
+version = "0.2.36"
 dependencies = [
  "dirs 4.0.0",
  "proc-mounts",
