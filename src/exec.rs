@@ -163,7 +163,7 @@ fn archive_free_space(
             // Squash alloc log
             tx.sync(true)?;
 
-            let mut end_block = tx.header.size() / BLOCK_SIZE;
+            let end_block = tx.header.size() / BLOCK_SIZE;
             /* TODO: Cut off any free blocks at the end of the filesystem
             let mut end_changed = true;
             while end_changed {
