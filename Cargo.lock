@@ -1236,9 +1236,9 @@ dependencies = [
 
 [[package]]
 name = "redox_installer"
-version = "0.2.13"
+version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cc9fcfc6c1685dbb258f28d39cb2c45c6da3179ec12c0cee565912e22a069ac"
+checksum = "cd9712ed992920689352a5b4cea2dd518a39b57b21139178c845a3b22f60b1a4"
 dependencies = [
  "arg_parser",
  "failure",
@@ -1354,9 +1354,9 @@ dependencies = [
 
 [[package]]
 name = "redoxfs"
-version = "0.5.9"
+version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42795be673f9648cddf36f7dfca05f3d2953e0f420760a309f33722c8d4808af"
+checksum = "0110129546df371384a9d2eee83b1b0c956556d2b84d3ff4292cffd5c26c6404"
 dependencies = [
  "aes",
  "argon2",
@@ -2300,18 +2300,18 @@ checksum = "dff9641d1cd4be8d1a070daf9e3773c5f67e78b4d9d42263020c057706765c04"
 
 [[package]]
 name = "winnow"
-version = "0.5.26"
+version = "0.5.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b67b5f0a4e7a27a64c651977932b9dc5667ca7fc31ac44b03ed37a0cf42fdfff"
+checksum = "6c830786f7720c2fd27a1a0e27a709dbd3c4d009b56d098fc742d4f4eab91fe2"
 dependencies = [
  "memchr",
 ]
 
 [[package]]
 name = "xattr"
-version = "1.1.2"
+version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d367426ae76bdfce3d8eaea6e94422afd6def7d46f9c89e2980309115b3c2c41"
+checksum = "a7dae5072fe1f8db8f8d29059189ac175196e410e40ba42d5d4684ae2f750995"
 dependencies = [
  "libc",
  "linux-raw-sys",
