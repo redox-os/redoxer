@@ -6,9 +6,38 @@ A pre-built Docker image can be found on [Docker Hub](https://hub.docker.com/r/r
 
 ## Commands
 
-- `cargo install redoxer` - install `redoxer` tool.
-- `redoxer toolchain` - install `redoxer` toolchain.
-- `redoxer build` - build project with `redoxer`.
-- `redoxer run` - run project with `redoxer`.
-- `redoxer test` - test project with `redoxer`.
-- `redoxer exec echo hello` - run arbitrary executable with `redoxer`.
+- Install the tool
+
+```sh
+cargo install redoxer
+```
+
+- Install the Redox toolchain
+
+```sh
+redoxer toolchain
+```
+
+- Build the Rust program or library with Redoxer
+
+```sh
+redoxer build
+```
+
+- Run the Rust program on Redox
+
+```sh
+redoxer run
+```
+
+- Test the Rust program or library with Redoxer
+
+```sh
+redoxer test
+```
+
+- Run arbitrary executable (`echo hello`) with Redoxer
+
+```sh
+redoxer exec echo hello
+```
