@@ -1,6 +1,6 @@
 [package]
 name = "redoxer"
-version = "0.2.42"
+version = "0.2.43"
 description = "Method for quickly running programs inside of Redox from a KVM capable OS."
 license = "MIT"
 authors = ["Jeremy Soller <jackpot51@gmail.com>"]
@@ -9,9 +9,9 @@ edition = "2018"
 
 [dependencies]
 dirs = "5.0.1"
-redox_installer = "0.2.18"
+redox_installer = "0.2.19"
 redox_syscall = "0.5"
 redoxfs = "0.6.1"
 tempfile = "3.8.1"
-toml = "0.8.8"
+toml = "0.5"
 proc-mounts = "0.3.0"
