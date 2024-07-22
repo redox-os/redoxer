@@ -6,6 +6,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get install -y -qq \
       build-essential \
       curl \
+      expect \
       fuse \
       libfuse-dev \
       pkg-config \
