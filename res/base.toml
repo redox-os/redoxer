@@ -7,6 +7,8 @@ prompt = false
 
 [packages.bash]
 
+[packages.bootloader]
+
 [packages.bootstrap]
 
 [packages.ca-certificates]
@@ -26,6 +28,8 @@ prompt = false
 [packages.gnu-binutils]
 
 [packages.initfs]
+
+[packages.ion]
 
 [packages.ipcd]
 
@@ -63,6 +67,15 @@ directory = false
 recursive_chown = false
 
 [[files]]
+path = "/usr/lib/init.d/00_drivers"
+data = """
+pcid /etc/pcid.d/
+"""
+symlink = false
+directory = false
+recursive_chown = false
+
+[[files]]
 path = "/etc/hostname"
 data = """
 redox
@@ -73,17 +86,17 @@ recursive_chown = false
 
 [[files]]
 path = "/usr/lib/os-release"
-data = """
-PRETTY_NAME=\"Redox OS 0.8.0\"
-NAME=\"Redox OS\"
-VERSION_ID=\"0.8.0\"
-VERSION=\"0.8.0\"
-ID=\"redox-os\"
+data = '''
+PRETTY_NAME="Redox OS 0.9.0"
+NAME="Redox OS"
+VERSION_ID="0.9.0"
+VERSION="0.9.0"
+ID="redox-os"
 
-HOME_URL=\"https://redox-os.org/\"
-DOCUMENTATION_URL=\"https://redox-os.org/docs/\"
-SUPPORT_URL=\"https://redox-os.org/community/\"
-"""
+HOME_URL="https://redox-os.org/"
+DOCUMENTATION_URL="https://redox-os.org/docs/"
+SUPPORT_URL="https://redox-os.org/community/"
+'''
 symlink = false
 directory = false
 recursive_chown = false
@@ -149,6 +162,21 @@ directory = false
 recursive_chown = false
 
 [[files]]
+path = "/usr/libexec"
+data = ""
+symlink = false
+directory = true
+mode = 493
+recursive_chown = false
+
+[[files]]
+path = "/libexec"
+data = "usr/libexec"
+symlink = true
+directory = false
+recursive_chown = false
+
+[[files]]
 path = "/usr/share"
 data = ""
 symlink = false
@@ -165,28 +193,28 @@ recursive_chown = false
 
 [[files]]
 path = "/dev/null"
-data = "null:"
+data = "/scheme/null"
 symlink = true
 directory = false
 recursive_chown = false
 
 [[files]]
 path = "/dev/random"
-data = "rand:"
+data = "/scheme/rand"
 symlink = true
 directory = false
 recursive_chown = false
 
 [[files]]
 path = "/dev/urandom"
-data = "rand:"
+data = "/scheme/rand"
 symlink = true
 directory = false
 recursive_chown = false
 
 [[files]]
 path = "/dev/zero"
-data = "zero:"
+data = "/scheme/zero"
 symlink = true
 directory = false
 recursive_chown = false
@@ -216,15 +244,6 @@ recursive_chown = false
 path = "/dev/stderr"
 data = "libc:stderr"
 symlink = true
-directory = false
-recursive_chown = false
-
-[[files]]
-path = "/usr/lib/init.d/00_drivers"
-data = """
-pcid /etc/pcid.d/
-"""
-symlink = false
 directory = false
 recursive_chown = false
 
@@ -270,15 +289,6 @@ recursive_chown = false
 path = "/etc/net/ip_subnet"
 data = """
 255.255.255.0
-"""
-symlink = false
-directory = false
-recursive_chown = false
-
-[[files]]
-path = "/etc/net/mac"
-data = """
-54-52-00-ab-cd-ef
 """
 symlink = false
 directory = false
@@ -337,9 +347,11 @@ uid = 0
 gid = 0
 name = "root"
 home = "/root"
+shell = "/usr/bin/ion"
 
 [users.user]
 password = ""
+shell = "/usr/bin/ion"
 
 [groups.sudo]
 gid = 1
