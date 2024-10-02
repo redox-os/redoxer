@@ -1,4 +1,5 @@
 use redoxfs::{archive_at, DiskSparse, FileSystem, TreePtr, BLOCK_SIZE};
+use std::env::VarError;
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -198,19 +199,34 @@ fn archive_free_space(
     Ok(())
 }
 
+struct RedoxerConfig {
+    qemu_binary: Option<String>,
+    fuse: Option<bool>,
+    // TODO: gui: bool, or generalize it into any config TOML
+}
+
 fn inner(
     arguments: &[String],
+    config: &RedoxerConfig,
     folder_opt: Option<String>,
     gui: bool,
     output_opt: Option<String>,
 ) -> io::Result<i32> {
-    let kvm = Path::new("/dev/kvm").exists();
-    if !installed("qemu-system-x86_64")? {
+    let qemu_binary = config
+        .qemu_binary
+        .as_deref()
+        .unwrap_or("qemu-system-x86_64");
+
+    if !installed(qemu_binary)? {
         eprintln!("redoxer: qemu-system-x86 not found, please install before continuing");
         process::exit(1);
     }
+    let kvm = Path::new("/dev/kvm").exists();
 
-    let fuse = Path::new("/dev/fuse").exists();
+    let fuse = config
+        .fuse
+        .unwrap_or_else(|| Path::new("/dev/fuse").exists());
+
     if fuse {
         if !installed("fusermount")? {
             eprintln!("redoxer: fuse not found, please install before continuing");
@@ -260,6 +276,7 @@ fn inner(
 
             let toolchain_lib_dir = toolchain_dir.join(target()).join("lib");
             let lib_dir = redoxer_dir.join("lib");
+            // TODO: Don't hardcode
             for obj in &[
                 "ld64.so.1",
                 "libc.so",
@@ -324,16 +341,13 @@ fn inner(
         }
 
         if !fuse {
-            archive_free_space(
-                &redoxer_bin,
-                &redoxer_dir,
-                &bootloader_bin,
-                DISK_SIZE,
-            )?;
+            archive_free_space(&redoxer_bin, &redoxer_dir, &bootloader_bin, DISK_SIZE)?;
         }
 
         let redoxer_log = tempdir.path().join("redoxer.log");
-        let mut command = Command::new("qemu-system-x86_64");
+        let mut command = Command::new(qemu_binary);
+
+        // TODO: Support configuring these options
         command
             .arg("-cpu")
             .arg("max")
@@ -455,7 +469,22 @@ pub fn main(args: &[String]) {
         usage();
     }
 
-    match inner(&arguments, folder_opt, gui, output_opt) {
+    use std::env::var;
+    fn parse_bool_env(name: &str) -> Option<bool> {
+        match var(name).as_deref() {
+            Ok("true" | "1") => Some(true),
+            Ok("false" | "0") => Some(false),
+            Ok(arg) => panic!("invalid argument {} for REDOXER_USE_FUSE", arg),
+            Err(VarError::NotPresent) => None,
+            Err(VarError::NotUnicode(_)) => panic!("non-utf8 argument for {}", name),
+        }
+    }
+    let config = RedoxerConfig {
+        qemu_binary: var("REDOXER_QEMU_BINARY").ok(),
+        fuse: parse_bool_env("REDOXER_USE_FUSE"),
+    };
+
+    match inner(&arguments, &config, folder_opt, gui, output_opt) {
         Ok(code) => {
             process::exit(code);
         }
