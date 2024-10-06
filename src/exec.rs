@@ -1,10 +1,11 @@
 use std::env::VarError;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{fs, io};
 
-use anyhow::{anyhow, Context, Error, Result};
+use anyhow::{Context, Result};
 
 use redoxfs::{archive_at, DiskSparse, FileSystem, TreePtr, BLOCK_SIZE};
 
@@ -38,8 +39,7 @@ fn bootloader() -> Result<PathBuf> {
             .insert("bootloader".to_string(), Default::default());
         let cookbook: Option<&str> = None;
         redox_installer::install(config, &bootloader_dir, cookbook, INSTALL_LIVE_IMAGE)
-            // TODO: Migrate from failure to anyhow in redox_installer
-            .map_err(|error| anyhow!("redox_installer failed: {error}"))?;
+            .context("redox_installer failed")?;
 
         fs::rename(
             &bootloader_dir.join("boot/bootloader.bios"),
@@ -49,7 +49,12 @@ fn bootloader() -> Result<PathBuf> {
     Ok(bootloader_bin)
 }
 
-fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> Result<PathBuf> {
+fn base(
+    bootloader_bin: &Path,
+    gui: bool,
+    fuse: bool,
+    custom_toml: Option<&str>,
+) -> Result<PathBuf> {
     let name = if gui { "gui" } else { "base" };
     let ext = if fuse { "bin" } else { "tar" };
 
@@ -98,13 +103,17 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> Result<PathBuf> {
             } else {
                 None
             };
+            let config_toml = match custom_toml {
+                Some(custom) => std::fs::read_to_string(custom)?,
+                None => (if gui { GUI_TOML } else { BASE_TOML }).to_owned(),
+            };
 
             let config: redox_installer::Config =
-                toml::from_str(if gui { GUI_TOML } else { BASE_TOML }).context("invalid toml")?;
+                toml::from_str(&config_toml).context("invalid toml")?;
 
             let cookbook: Option<&str> = None;
             redox_installer::install(config, &base_dir, cookbook, INSTALL_LIVE_IMAGE)
-                .map_err(|err| anyhow!("redox_installer failed: {err}"))?;
+                .context("redox_installer failed")?;
 
             if let Some(mut redoxfs) = redoxfs_opt {
                 redoxfs.unmount()?;
@@ -206,7 +215,9 @@ struct RedoxerConfig {
     qemu_binary: Option<String>,
     fuse: Option<bool>,
     gui: bool,
-    // TODO: gui: bool, or generalize it into any config TOML
+    custom_toml: Option<String>,
+    qemu_ncpu: Option<u32>,
+    qemu_mem_mib: Option<u64>,
 }
 
 fn inner(
@@ -242,7 +253,12 @@ fn inner(
 
     let toolchain_dir = toolchain()?;
     let bootloader_bin = bootloader()?;
-    let base_bin = base(&bootloader_bin, config.gui, fuse)?;
+    let base_bin = base(
+        &bootloader_bin,
+        config.gui,
+        fuse,
+        config.custom_toml.as_deref(),
+    )?;
 
     let tempdir = tempfile::tempdir()?;
 
@@ -356,9 +372,9 @@ fn inner(
             .arg("-machine")
             .arg("q35")
             .arg("-m")
-            .arg("2048")
+            .arg(config.qemu_mem_mib.unwrap_or(2048).to_string())
             .arg("-smp")
-            .arg("4")
+            .arg(config.qemu_ncpu.unwrap_or(4).to_string())
             .arg("-serial")
             .arg("mon:stdio")
             .arg("-chardev")
@@ -429,6 +445,8 @@ pub fn main(args: &[String]) {
     let mut output_opt = None;
     // Arguments to pass to command
     let mut arguments = Vec::new();
+    // Custom toml to pass to installer
+    let mut custom_toml = None;
 
     let mut args = args.iter().cloned().skip(2);
     while let Some(arg) = args.next() {
@@ -456,6 +474,10 @@ pub fn main(args: &[String]) {
                     usage();
                 }
             },
+            "-c" | "--custom-toml" if matching => match args.next() {
+                Some(output) => custom_toml = Some(output),
+                None => usage(),
+            },
             // TODO: "-p" | "--package"
             "--" if matching => {
                 matching = false;
@@ -476,7 +498,16 @@ pub fn main(args: &[String]) {
         match var(name).as_deref() {
             Ok("true" | "1") => Some(true),
             Ok("false" | "0") => Some(false),
-            Ok(arg) => panic!("invalid argument {} for REDOXER_USE_FUSE", arg),
+            Ok(arg) => panic!("invalid argument {} for {}", arg, name),
+            Err(VarError::NotPresent) => None,
+            Err(VarError::NotUnicode(_)) => panic!("non-utf8 argument for {}", name),
+        }
+    }
+    fn parse_int_env<T: FromStr>(name: &str) -> Option<T> {
+        match var(name).as_deref() {
+            Ok(s) => {
+                Some(T::from_str(s).unwrap_or_else(|_| panic!("invalid argument for {}", name)))
+            }
             Err(VarError::NotPresent) => None,
             Err(VarError::NotUnicode(_)) => panic!("non-utf8 argument for {}", name),
         }
@@ -485,6 +516,9 @@ pub fn main(args: &[String]) {
         qemu_binary: var("REDOXER_QEMU_BINARY").ok(),
         fuse: parse_bool_env("REDOXER_USE_FUSE"),
         gui,
+        custom_toml,
+        qemu_ncpu: parse_int_env("REDOXER_QEMU_NCPU"),
+        qemu_mem_mib: parse_int_env("REDOXER_QEMU_MEM_MIB"),
     };
 
     match inner(&arguments, &config, folder_opt, output_opt) {

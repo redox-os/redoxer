@@ -9,10 +9,14 @@ edition = "2018"
 
 [dependencies]
 dirs = "5.0.1"
-redox_installer = "0.2.24"
+#redox_installer = "0.2.24"
+redox_installer = { git = "https://gitlab.redox-os.org/redox-os/installer.git" }
 redox_syscall = "0.5"
 redoxfs = "0.6.6"
 tempfile = "3.8.1"
 toml = "0.5"
 proc-mounts = "0.3.0"
 anyhow = "1.0.89"
+
+[workspace]
+members = ["daemon"]
