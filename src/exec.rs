@@ -202,6 +202,7 @@ fn archive_free_space(
 struct RedoxerConfig {
     qemu_binary: Option<String>,
     fuse: Option<bool>,
+    gui: bool,
     // TODO: gui: bool, or generalize it into any config TOML
 }
 
@@ -209,7 +210,6 @@ fn inner(
     arguments: &[String],
     config: &RedoxerConfig,
     folder_opt: Option<String>,
-    gui: bool,
     output_opt: Option<String>,
 ) -> io::Result<i32> {
     let qemu_binary = config
@@ -239,7 +239,7 @@ fn inner(
 
     let toolchain_dir = toolchain()?;
     let bootloader_bin = bootloader()?;
-    let base_bin = base(&bootloader_bin, gui, fuse)?;
+    let base_bin = base(&bootloader_bin, config.gui, fuse)?;
 
     let tempdir = tempfile::tempdir()?;
 
@@ -374,7 +374,7 @@ fn inner(
         if kvm {
             command.arg("-accel").arg("kvm");
         }
-        if !gui {
+        if !config.gui {
             command.arg("-nographic").arg("-vga").arg("none");
         }
 
@@ -482,9 +482,10 @@ pub fn main(args: &[String]) {
     let config = RedoxerConfig {
         qemu_binary: var("REDOXER_QEMU_BINARY").ok(),
         fuse: parse_bool_env("REDOXER_USE_FUSE"),
+        gui,
     };
 
-    match inner(&arguments, &config, folder_opt, gui, output_opt) {
+    match inner(&arguments, &config, folder_opt, output_opt) {
         Ok(code) => {
             process::exit(code);
         }
