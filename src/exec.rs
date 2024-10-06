@@ -1,9 +1,12 @@
-use redoxfs::{archive_at, DiskSparse, FileSystem, TreePtr, BLOCK_SIZE};
 use std::env::VarError;
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io};
+
+use anyhow::{anyhow, Context, Error, Result};
+
+use redoxfs::{archive_at, DiskSparse, FileSystem, TreePtr, BLOCK_SIZE};
 
 use crate::redoxfs::RedoxFs;
 use crate::{installed, redoxer_dir, status_error, syscall_error, target, toolchain};
@@ -18,7 +21,7 @@ static GUI_TOML: &'static str = include_str!("../res/gui.toml");
 /// For this reason no live image is required
 const INSTALL_LIVE_IMAGE: bool = false;
 
-fn bootloader() -> io::Result<PathBuf> {
+fn bootloader() -> Result<PathBuf> {
     let bootloader_bin = redoxer_dir().join("bootloader.bin");
     if !bootloader_bin.is_file() {
         eprintln!("redoxer: building bootloader");
@@ -35,7 +38,8 @@ fn bootloader() -> io::Result<PathBuf> {
             .insert("bootloader".to_string(), Default::default());
         let cookbook: Option<&str> = None;
         redox_installer::install(config, &bootloader_dir, cookbook, INSTALL_LIVE_IMAGE)
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
+            // TODO: Migrate from failure to anyhow in redox_installer
+            .map_err(|error| anyhow!("redox_installer failed: {error}"))?;
 
         fs::rename(
             &bootloader_dir.join("boot/bootloader.bios"),
@@ -45,7 +49,7 @@ fn bootloader() -> io::Result<PathBuf> {
     Ok(bootloader_bin)
 }
 
-fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
+fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> Result<PathBuf> {
     let name = if gui { "gui" } else { "base" };
     let ext = if fuse { "bin" } else { "tar" };
 
@@ -96,12 +100,11 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
             };
 
             let config: redox_installer::Config =
-                toml::from_str(if gui { GUI_TOML } else { BASE_TOML })
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
+                toml::from_str(if gui { GUI_TOML } else { BASE_TOML }).context("invalid toml")?;
 
             let cookbook: Option<&str> = None;
             redox_installer::install(config, &base_dir, cookbook, INSTALL_LIVE_IMAGE)
-                .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
+                .map_err(|err| anyhow!("redox_installer failed: {err}"))?;
 
             if let Some(mut redoxfs) = redoxfs_opt {
                 redoxfs.unmount()?;
@@ -131,7 +134,7 @@ fn archive_free_space(
     folder_path: &Path,
     bootloader_path: &Path,
     free_space: u64,
-) -> io::Result<()> {
+) -> Result<()> {
     let disk = DiskSparse::create(&disk_path, free_space).map_err(syscall_error)?;
 
     let bootloader = {
@@ -211,7 +214,7 @@ fn inner(
     config: &RedoxerConfig,
     folder_opt: Option<String>,
     output_opt: Option<String>,
-) -> io::Result<i32> {
+) -> Result<i32> {
     let qemu_binary = config
         .qemu_binary
         .as_deref()
@@ -302,10 +305,9 @@ fn inner(
                 // TODO: make this activated by a flag
                 if let Some(ref folder) = folder_opt {
                     let folder_canonical_path = fs::canonicalize(&folder)?;
-                    let folder_canonical = folder_canonical_path.to_str().ok_or(io::Error::new(
-                        io::ErrorKind::Other,
-                        "folder path is not valid UTF-8",
-                    ))?;
+                    let folder_canonical = folder_canonical_path
+                        .to_str()
+                        .context("folder path is not valid UTF-8")?;
                     if arg.starts_with(&folder_canonical) {
                         let arg_replace = arg.replace(folder_canonical, "/root");
                         eprintln!(
