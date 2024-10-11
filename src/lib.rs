@@ -12,6 +12,7 @@ const SUPPORTED_TARGETS: &'static [&'static str] = &[
     "x86_64-unknown-redox",
     "aarch64-unknown-redox",
     "i686-unknown-redox",
+    "riscv64gc-unknown-redox",
 ];
 
 fn installed(program: &str) -> io::Result<bool> {
@@ -69,6 +70,15 @@ pub fn target() -> &'static str {
     };
 
     SUPPORTED_TARGETS[index]
+}
+
+pub fn gnu_target() -> &'static str {
+    let rust_target = target();
+    if rust_target == "riscv64gc-unknown-redox" {
+        "riscv64-unknown-redox"
+    } else {
+        rust_target
+    }
 }
 
 pub fn main(args: &[String]) {
