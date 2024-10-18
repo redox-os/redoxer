@@ -6,7 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io};
 
 use crate::redoxfs::RedoxFs;
-use crate::{installed, redoxer_dir, status_error, syscall_error, target, toolchain};
+use crate::{installed, redoxer_dir, status_error, syscall_error};
 
 const BOOTLOADER_SIZE: usize = 2 * 1024 * 1024;
 const DISK_SIZE: u64 = 1024 * 1024 * 1024;
@@ -30,6 +30,11 @@ fn bootloader() -> io::Result<PathBuf> {
         fs::create_dir_all(&bootloader_dir)?;
 
         let mut config = redox_installer::Config::default();
+        config.files.push(redox_installer::FileConfig {
+            path: "/etc/pkg.d/50_redox".to_string(),
+            data: "https://static.redox-os.org/pkg".to_string(),
+            ..Default::default()
+        });
         config
             .packages
             .insert("bootloader".to_string(), Default::default());
@@ -237,7 +242,6 @@ fn inner(
         process::exit(1);
     }
 
-    let toolchain_dir = toolchain()?;
     let bootloader_bin = bootloader()?;
     let base_bin = base(&bootloader_bin, gui, fuse)?;
 
@@ -273,28 +277,6 @@ fn inner(
                     .and_then(status_error)?;
                 None
             };
-
-            let toolchain_lib_dir = toolchain_dir.join(target()).join("lib");
-            let lib_dir = redoxer_dir.join("lib");
-            // TODO: Don't hardcode
-            for obj in &[
-                "ld64.so.1",
-                "libc.so",
-                "libgcc_s.so",
-                "libgcc_s.so.1",
-                "libstdc++.so",
-                "libstdc++.so.6",
-                "libstdc++.so.6.0.32",
-            ] {
-                eprintln!("redoxer: copying '{}' to '/lib'", obj);
-
-                Command::new("rsync")
-                    .arg("--archive")
-                    .arg(&toolchain_lib_dir.join(obj))
-                    .arg(&lib_dir)
-                    .status()
-                    .and_then(status_error)?;
-            }
 
             let mut redoxerd_config = String::new();
             for arg in arguments.iter() {
