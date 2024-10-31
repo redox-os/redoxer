@@ -29,6 +29,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> io::Result<process::Command>
     command.env("RUSTUP_TOOLCHAIN", &toolchain_dir);
     command.env("TARGET", target());
     command.env("GNU_TARGET", gnu_target());
+    command.env("CFLAGS_riscv64gc_unknown_redox", "-march=rv64gc -mabi=lp64d");
 
     Ok(command)
 }

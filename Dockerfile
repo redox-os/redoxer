@@ -11,7 +11,8 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
       libfuse-dev \
       pkg-config \
       qemu-system-x86 \
-      rsync
+      rsync \
+      nasm
 
 # Install rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
@@ -25,7 +26,10 @@ COPY . /root/redoxer
 RUN cargo install --path /root/redoxer
 
 # Install redoxer toolchain
-RUN redoxer toolchain
+RUN TARGET=x86_64-unknown-redox redoxer toolchain && \
+    TARGET=i686-unknown-redox redoxer toolchain && \
+    TARGET=aarch64-unknown-redox redoxer toolchain && \
+    TARGET=riscv64gc-unknown-redox redoxer toolchain
 
 # Ensure redoxer exec is working
 RUN redoxer exec true

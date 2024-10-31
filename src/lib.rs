@@ -27,6 +27,7 @@ fn redoxer_dir() -> path::PathBuf {
     dirs::home_dir()
         .unwrap_or(path::PathBuf::from("."))
         .join(".redoxer")
+        .join(target())
 }
 
 fn status_error(status: process::ExitStatus) -> io::Result<()> {
