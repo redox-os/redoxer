@@ -127,6 +127,7 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
         }
 
         fs::rename(&base_partial, &base_bin)?;
+        fs::remove_dir_all(&base_dir)?;
     }
     Ok(base_bin)
 }

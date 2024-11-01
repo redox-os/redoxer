@@ -70,6 +70,8 @@ pub fn toolchain() -> io::Result<PathBuf> {
             .status()
             .and_then(status_error)?;
 
+        fs::remove_file(&shasum_file)?;
+        fs::remove_file(&prefix_tar)?;
         fs::rename(&toolchain_partial, &toolchain_dir)?;
     }
 
