@@ -27,9 +27,7 @@ RUN cargo install --path /root/redoxer
 
 # Install redoxer toolchain
 RUN TARGET=x86_64-unknown-redox redoxer toolchain && \
-    TARGET=i686-unknown-redox redoxer toolchain && \
-    TARGET=aarch64-unknown-redox redoxer toolchain && \
-    TARGET=riscv64gc-unknown-redox redoxer toolchain
+    TARGET=i686-unknown-redox redoxer toolchain
 
 # Ensure redoxer exec is working
 RUN redoxer exec true
