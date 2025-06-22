@@ -314,6 +314,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ce89b21cab1437276d2650d57e971f9d548a2d9037cc231abdc0562b97498ce"
 
 [[package]]
+name = "bytemuck"
+version = "1.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c76a5792e44e4abe34d3abf15636779261d45a7450612059293d1d2cfc63422"
+dependencies = [
+ "bytemuck_derive",
+]
+
+[[package]]
+name = "bytemuck_derive"
+version = "1.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ecc273b49b3205b83d648f0690daa588925572cc5063745bfe547fe7ec8e1a1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -683,16 +703,6 @@ checksum = "534c5cf6194dfab3db3242765c03bbe257cf92f22b38f6bc0c58d59108a820ba"
 dependencies = [
  "libc",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "error-chain"
-version = "0.12.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d2f06b9cac1506ece98fe3231e3cc9c4410ec3d5b1f24ae1c8946f0742cdefc"
-dependencies = [
- "backtrace",
- "version_check",
 ]
 
 [[package]]
@@ -1249,7 +1259,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fa925f9becb532d758b0014b472c576869910929cf4c3f8054b386f19ab9e21"
 dependencies = [
- "thiserror",
+ "thiserror 1.0.65",
 ]
 
 [[package]]
@@ -1278,55 +1288,49 @@ checksum = "953ec861398dccce10c670dfeaf3ec4911ca479e9c02154b3a215178c5f566f2"
 
 [[package]]
 name = "pkgar"
-version = "0.1.15"
+version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "850f50a19f791c0ac7c1c8b559d36f73a652dc423216282807aac7380fecc198"
+checksum = "db98a45d3bdaf7dceeee5716f3eec9af0e67deec64eec9e717536b89de323c22"
 dependencies = [
+ "anyhow",
  "blake3",
+ "bytemuck",
  "clap",
- "error-chain",
  "pkgar-core",
  "pkgar-keys",
- "plain",
- "user-error",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
 name = "pkgar-core"
-version = "0.1.15"
+version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "365a518b54ba821f5e84fd4a92b7b592ef2aa20acda3d41d7d7bc20f688dac3f"
+checksum = "dd0fc2b3be98c639c37ff54ebedeba654acc7e9c26b75c2ddff752f90b7a1618"
 dependencies = [
  "bitflags 1.3.2",
  "blake3",
+ "bytemuck",
  "dryoc",
- "plain",
 ]
 
 [[package]]
 name = "pkgar-keys"
-version = "0.1.15"
+version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06116ba0b805d25edf7d03670a551dbcaa8305a1695d80d0f078e43707b7999a"
+checksum = "4494325c5c408d718d1df657cceeadc2102f02e7c9298343ce230f557f13e80c"
 dependencies = [
+ "anyhow",
  "clap",
  "dirs 3.0.2",
- "error-chain",
  "hex",
  "lazy_static",
  "pkgar-core",
  "seckey",
  "serde",
  "termion",
+ "thiserror 2.0.12",
  "toml 0.8.19",
- "user-error",
 ]
-
-[[package]]
-name = "plain"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
 name = "portable-atomic"
@@ -1380,7 +1384,7 @@ dependencies = [
  "rustc-hash",
  "rustls",
  "socket2",
- "thiserror",
+ "thiserror 1.0.65",
  "tokio",
  "tracing",
 ]
@@ -1397,7 +1401,7 @@ dependencies = [
  "rustc-hash",
  "rustls",
  "slab",
- "thiserror",
+ "thiserror 1.0.65",
  "tinyvec",
  "tracing",
 ]
@@ -1489,10 +1493,11 @@ checksum = "436d45c2b6a5b159d43da708e62b25be3a4a3d5550d654b72216ade4c4bfd717"
 
 [[package]]
 name = "redox-pkg"
-version = "0.2.1"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e74e8f571b1a91c18e716d73accdf1bdc72a1c93c586f349a6018db3b1424afd"
+checksum = "70f49b2c29ae3c72ff3a8dbc1c5eefba9093a8c5ceaa8ca5292833816fe931e2"
 dependencies = [
+ "anyhow",
  "indicatif",
  "pkgar",
  "pkgar-core",
@@ -1500,7 +1505,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_derive",
- "thiserror",
+ "thiserror 1.0.65",
  "toml 0.8.19",
 ]
 
@@ -1516,9 +1521,9 @@ dependencies = [
 
 [[package]]
 name = "redox_installer"
-version = "0.2.29"
+version = "0.2.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af62ec0301597b6560949922155d1e717552ca6c0c24cef7f2e3f15f8f6ac33d"
+checksum = "7f9515d2f6a812df5f51fe60d266f6a0b9452c1fb86a429b1795da5597e2fb55"
 dependencies = [
  "anyhow",
  "arg_parser",
@@ -1579,12 +1584,12 @@ checksum = "ba009ff324d1fc1b900bd1fdb31564febe58a8ccc8a6fdbb93b543d33b13ca43"
 dependencies = [
  "getrandom 0.2.15",
  "libredox",
- "thiserror",
+ "thiserror 1.0.65",
 ]
 
 [[package]]
 name = "redoxer"
-version = "0.2.51"
+version = "0.2.52"
 dependencies = [
  "dirs 5.0.1",
  "proc-mounts",
@@ -1597,9 +1602,9 @@ dependencies = [
 
 [[package]]
 name = "redoxfs"
-version = "0.6.8"
+version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c8756cd15a32143479f4a723ececcbe2b8e422242924b0628a163826aea8c4d"
+checksum = "abd0ff771316b592dfc1f5f8e0a2d5a322c2471ed3a53e4d5eae3b0fd5aebe27"
 dependencies = [
  "aes",
  "argon2",
@@ -1957,9 +1962,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "syn"
-version = "2.0.85"
+version = "2.0.87"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5023162dfcd14ef8f32034d8bcd4cc5ddc61ef7a247c024a33e24e1f24d21b56"
+checksum = "25aa4ce346d03a6dcd68dd8b4010bcb74e54e62c90c573f394c46eae99aba32d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2015,7 +2020,16 @@ version = "1.0.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d11abd9594d9b38965ef50805c5e469ca9cc6f197f883f717e0269a3057b3d5"
 dependencies = [
- "thiserror-impl",
+ "thiserror-impl 1.0.65",
+]
+
+[[package]]
+name = "thiserror"
+version = "2.0.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "567b8a2dae586314f7be2a752ec7474332959c6460e02bde30d702a66d488708"
+dependencies = [
+ "thiserror-impl 2.0.12",
 ]
 
 [[package]]
@@ -2023,6 +2037,17 @@ name = "thiserror-impl"
 version = "1.0.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae71770322cbd277e69d762a16c444af02aa0575ac0d174f0b9562d3b37f8602"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "2.0.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f7cf42b4507d8ea322120659672cf1b9dbb93f8f2d4ecfd6e51350ff5b17a1d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2225,12 +2250,6 @@ dependencies = [
  "idna",
  "percent-encoding",
 ]
-
-[[package]]
-name = "user-error"
-version = "1.2.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07a91d0648d862a02d641c82292791accfe66d36df75d8149ebc9768f2e36863"
 
 [[package]]
 name = "utf8parse"
