@@ -5,19 +5,19 @@ include = []
 [general]
 prompt = false
 
+[packages.base]
+
+[packages.base-initfs]
+
 [packages.bash]
 
 [packages.bootloader]
-
-[packages.bootstrap]
 
 [packages.ca-certificates]
 
 [packages.coreutils]
 
 [packages.drivers]
-
-[packages.escalated]
 
 [packages.extrautils]
 
@@ -27,17 +27,15 @@ prompt = false
 
 [packages.gnu-binutils]
 
-[packages.initfs]
-
 [packages.ion]
-
-[packages.ipcd]
 
 [packages.kernel]
 
-[packages.netdb]
+[packages.libgcc]
 
-[packages.netstack]
+[packages.libstdcxx]
+
+[packages.netdb]
 
 [packages.netutils]
 
@@ -46,8 +44,6 @@ prompt = false
 [packages.orbital]
 
 [packages.pkgutils]
-
-[packages.ptyd]
 
 [packages.redoxerd]
 
@@ -64,7 +60,7 @@ mkdir -m a=rwxt /tmp
 
 ipcd
 ptyd
-escalated
+sudo --daemon
 """
 symlink = false
 directory = false
@@ -73,7 +69,7 @@ recursive_chown = false
 [[files]]
 path = "/usr/lib/init.d/00_drivers"
 data = """
-pcid /etc/pcid.d/
+pcid-spawner /etc/pcid.d/
 """
 symlink = false
 directory = false
@@ -81,16 +77,14 @@ recursive_chown = false
 
 [[files]]
 path = "/etc/hostname"
-data = """
-redox
-"""
+data = "redox"
 symlink = false
 directory = false
 recursive_chown = false
 
 [[files]]
 path = "/usr/lib/os-release"
-data = '''
+data = """
 PRETTY_NAME="Redox OS 0.9.0"
 NAME="Redox OS"
 VERSION_ID="0.9.0"
@@ -100,7 +94,7 @@ ID="redox-os"
 HOME_URL="https://redox-os.org/"
 DOCUMENTATION_URL="https://redox-os.org/docs/"
 SUPPORT_URL="https://redox-os.org/community/"
-'''
+"""
 symlink = false
 directory = false
 recursive_chown = false
@@ -109,6 +103,13 @@ recursive_chown = false
 path = "/etc/os-release"
 data = "../usr/lib/os-release"
 symlink = true
+directory = false
+recursive_chown = false
+
+[[files]]
+path = "/etc/pkg.d/50_redox"
+data = "https://static.redox-os.org/pkg"
+symlink = false
 directory = false
 recursive_chown = false
 
@@ -174,13 +175,6 @@ mode = 493
 recursive_chown = false
 
 [[files]]
-path = "/libexec"
-data = "usr/libexec"
-symlink = true
-directory = false
-recursive_chown = false
-
-[[files]]
 path = "/usr/share"
 data = ""
 symlink = false
@@ -193,6 +187,61 @@ path = "/share"
 data = "usr/share"
 symlink = true
 directory = false
+recursive_chown = false
+
+[[files]]
+path = "/usr/share/fonts"
+data = "../../ui/fonts"
+symlink = true
+directory = false
+recursive_chown = false
+
+[[files]]
+path = "/var"
+data = ""
+symlink = false
+directory = true
+mode = 493
+recursive_chown = false
+
+[[files]]
+path = "/var/cache"
+data = ""
+symlink = false
+directory = true
+mode = 493
+recursive_chown = false
+
+[[files]]
+path = "/var/lib"
+data = ""
+symlink = false
+directory = true
+mode = 493
+recursive_chown = false
+
+[[files]]
+path = "/var/lock"
+data = ""
+symlink = false
+directory = true
+mode = 1023
+recursive_chown = false
+
+[[files]]
+path = "/var/log"
+data = ""
+symlink = false
+directory = true
+mode = 493
+recursive_chown = false
+
+[[files]]
+path = "/var/tmp"
+data = ""
+symlink = false
+directory = true
+mode = 1023
 recursive_chown = false
 
 [[files]]
@@ -334,13 +383,6 @@ echo
 echo ## running redoxer ##
 redoxerd
 """
-symlink = false
-directory = false
-recursive_chown = false
-
-[[files]]
-path = "/etc/pkg.d/50_redox"
-data = "https://static.redox-os.org/pkg"
 symlink = false
 directory = false
 recursive_chown = false
