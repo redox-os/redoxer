@@ -39,7 +39,7 @@ fn bootloader() -> io::Result<PathBuf> {
             .packages
             .insert("bootloader".to_string(), Default::default());
         let cookbook: Option<&str> = None;
-        redox_installer::install(config, &bootloader_dir, cookbook, INSTALL_LIVE_IMAGE)
+        redox_installer::install(config, &bootloader_dir, cookbook, INSTALL_LIVE_IMAGE, None)
             .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
 
         fs::rename(
@@ -105,7 +105,7 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
                     .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
 
             let cookbook: Option<&str> = None;
-            redox_installer::install(config, &base_dir, cookbook, INSTALL_LIVE_IMAGE)
+            redox_installer::install(config, &base_dir, cookbook, INSTALL_LIVE_IMAGE, None)
                 .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
 
             if let Some(mut redoxfs) = redoxfs_opt {
