@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 # Install dependencies
 RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get update -qq && \
-    apt-get install -y -qq \
+    apt-get install -y -qq --no-install-recommends \
       build-essential \
       curl \
       expect \
@@ -12,7 +12,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
       pkg-config \
       qemu-system-x86 \
       rsync \
-      nasm --no-install-recommends
+      nasm
 
 # Install rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
