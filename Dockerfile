@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 # Install dependencies
 RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get update -qq && \
-    apt-get install -y -qq \
+    apt-get install -y -qq --no-install-recommends \
       build-essential \
       curl \
       expect \
