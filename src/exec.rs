@@ -9,7 +9,7 @@ use crate::redoxfs::RedoxFs;
 use crate::{installed, redoxer_dir, status_error, syscall_error};
 
 const BOOTLOADER_SIZE: usize = 2 * 1024 * 1024;
-const DISK_SIZE: u64 = 1024 * 1024 * 1024;
+const DISK_SIZE: u64 = 2 * 1024 * 1024 * 1024;
 
 static BASE_TOML: &'static str = include_str!("../res/base.toml");
 static GUI_TOML: &'static str = include_str!("../res/gui.toml");
