@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM --platform=linux/amd64 ubuntu:24.04
 
 # Install dependencies
 RUN export DEBIAN_FRONTEND=noninteractive && \
@@ -26,7 +26,7 @@ ENV PATH=/root/.cargo/bin:$PATH
 # Install redoxer
 COPY . /root/redoxer
 RUN cargo install --path /root/redoxer && \
-    rm -rf /root/redoxer /root/.cargo
+    rm -rf /root/redoxer /root/.cargo/git /root/.cargo/registry 
 
 # Install redoxer toolchain
 RUN TARGET=x86_64-unknown-redox redoxer toolchain
