@@ -9,6 +9,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b8e56985ec62d17e9c1001dc89c88ecd7dc08e47eba5ec7c29c7b5eeecde967"
 
 [[package]]
+name = "libc"
+version = "0.2.174"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1171693293099992e19cddea4e8b849964e9846f4acee11b3948bcc337be8776"
+
+[[package]]
+name = "libredox"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1580801010e535496706ba011c15f8532df6b42297d2e471fec38ceadd8c0638"
+dependencies = [
+ "bitflags",
+ "libc",
+ "redox_syscall",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -27,6 +44,7 @@ checksum = "20145670ba436b55d91fc92d25e71160fbfbdd57831631c8d7d36377a476f1cb"
 name = "redoxerd"
 version = "0.1.0"
 dependencies = [
+ "libredox",
  "redox_syscall",
  "redox_termios",
 ]

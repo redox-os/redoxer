@@ -14,25 +14,39 @@ fn syscall_error(error: syscall::Error) -> io::Error {
     io::Error::from_raw_os_error(error.errno)
 }
 
-// TODO: temporary wrapper in redox_syscall?
-unsafe fn sys_call(fd: usize, buf: &mut [u8], metadata: &[u64]) -> io::Result<usize> {
-    Ok(syscall::syscall5(
-        syscall::SYS_CALL,
+extern "C" {
+    fn redox_cur_thrfd_v0() -> usize;
+
+    fn redox_sys_call_v0(
+        fd: usize,
+        payload: *mut u8,
+        payload_len: usize,
+        flags: usize,
+        metadata: *const u64,
+        metadata_len: usize,
+    ) -> usize;
+}
+
+unsafe fn sys_call<T>(
+    fd: usize,
+    payload: &mut T,
+    flags: usize,
+    metadata: &[u64],
+) -> libredox::error::Result<usize> {
+    libredox::error::Error::demux(redox_sys_call_v0(
         fd,
-        buf.as_mut_ptr() as usize,
-        buf.len(),
+        payload as *mut T as *mut u8,
+        std::mem::size_of::<T>(),
+        flags,
+        metadata.as_ptr(),
         metadata.len(),
-        metadata.as_ptr() as usize,
-    ).map_err(syscall_error)?)
+    ))
 }
 
 // TODO: Copied from drivers, should this be moved to redox_syscall or move the whole daemon to driver?
 fn acquire_port_io_rights() -> io::Result<()> {
-    extern "C" {
-        fn redox_cur_thrfd_v0() -> usize;
-    }
     let kernel_fd = syscall::dup(unsafe { redox_cur_thrfd_v0() }, b"open_via_dup").map_err(syscall_error)?;
-    let res = unsafe { sys_call(kernel_fd, &mut [], &[ProcSchemeVerb::Iopl as u64]) };
+    let res = unsafe { sys_call::<[u8; 0]>(kernel_fd, &mut [], 0, &[ProcSchemeVerb::Iopl as u64]) };
     let _ = syscall::close(kernel_fd);
     res?;
     Ok(())
