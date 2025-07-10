@@ -5,13 +5,37 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::os::unix::io::{FromRawFd, IntoRawFd, RawFd};
 use std::process::{Child, Command, ExitStatus, Stdio};
-use syscall::{Io, Pio};
+use syscall::{Io, Pio, ProcSchemeVerb};
 
 const DEFAULT_COLS: u32 = 80;
 const DEFAULT_LINES: u32 = 30;
 
 fn syscall_error(error: syscall::Error) -> io::Error {
     io::Error::from_raw_os_error(error.errno)
+}
+
+// TODO: temporary wrapper in redox_syscall?
+unsafe fn sys_call(fd: usize, buf: &mut [u8], metadata: &[u64]) -> io::Result<usize> {
+    Ok(syscall::syscall5(
+        syscall::SYS_CALL,
+        fd,
+        buf.as_mut_ptr() as usize,
+        buf.len(),
+        metadata.len(),
+        metadata.as_ptr() as usize,
+    ).map_err(syscall_error)?)
+}
+
+// TODO: Copied from drivers, should this be moved to redox_syscall or move the whole daemon to driver?
+fn acquire_port_io_rights() -> io::Result<()> {
+    extern "C" {
+        fn redox_cur_thrfd_v0() -> usize;
+    }
+    let kernel_fd = syscall::dup(unsafe { redox_cur_thrfd_v0() }, b"open_via_dup").map_err(syscall_error)?;
+    let res = unsafe { sys_call(kernel_fd, &mut [], &[ProcSchemeVerb::Iopl as u64]) };
+    let _ = syscall::close(kernel_fd);
+    res?;
+    Ok(())
 }
 
 pub fn handle(event_file: &mut File, master_fd: RawFd, timeout_fd: RawFd, process: &mut Child) -> io::Result<ExitStatus> {
@@ -77,7 +101,7 @@ pub fn handle(event_file: &mut File, master_fd: RawFd, timeout_fd: RawFd, proces
 }
 
 pub fn getpty(columns: u32, lines: u32) -> io::Result<(RawFd, String)> {
-    let master = syscall::open("pty:", syscall::O_CLOEXEC | syscall::O_RDWR | syscall::O_CREAT | syscall::O_NONBLOCK)
+    let master = syscall::open("/scheme/pty", syscall::O_CLOEXEC | syscall::O_RDWR | syscall::O_CREAT | syscall::O_NONBLOCK)
         .map_err(syscall_error)?;
 
     if let Ok(winsize_fd) = syscall::dup(master, b"winsize") {
@@ -94,7 +118,7 @@ pub fn getpty(columns: u32, lines: u32) -> io::Result<(RawFd, String)> {
 }
 
 fn inner() -> io::Result<()> {
-    unsafe { syscall::iopl(3).map_err(syscall_error)?; }
+    acquire_port_io_rights()?;
 
     let config = fs::read_to_string("/etc/redoxerd")?;
     let mut config_lines = config.lines();
@@ -102,7 +126,7 @@ fn inner() -> io::Result<()> {
     let (columns, lines) = (DEFAULT_COLS, DEFAULT_LINES);
     let (master_fd, pty) = getpty(columns, lines)?;
 
-    let timeout_fd = syscall::open("time:4", syscall::O_CLOEXEC | syscall::O_RDWR | syscall::O_NONBLOCK)
+    let timeout_fd = syscall::open("/scheme/time/4", syscall::O_CLOEXEC | syscall::O_RDWR | syscall::O_NONBLOCK)
         .map_err(syscall_error)? as RawFd;
 
     let mut event_file = OpenOptions::new()
