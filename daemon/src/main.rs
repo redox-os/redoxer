@@ -43,7 +43,9 @@ unsafe fn sys_call<T>(
     ))
 }
 
-// TODO: Copied from drivers, should this be moved to redox_syscall or move the whole daemon to driver?
+// TODO: Copied from drivers repo, so:
+//   a. this function should be moved to libredox
+//   b. move the qemu test driver part to drivers repo and let redoxerd communicate with that driver instead
 fn acquire_port_io_rights() -> io::Result<()> {
     let kernel_fd = syscall::dup(unsafe { redox_cur_thrfd_v0() }, b"open_via_dup").map_err(syscall_error)?;
     let res = unsafe { sys_call::<[u8; 0]>(kernel_fd, &mut [], 0, &[ProcSchemeVerb::Iopl as u64]) };
