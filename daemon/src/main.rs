@@ -146,7 +146,7 @@ fn inner() -> io::Result<()> {
     let mut event_file = OpenOptions::new()
         .read(true)
         .write(true)
-        .open("event:")?;
+        .open("/scheme/event")?;
 
     event_file.write(&syscall::Event {
         id: master_fd as usize,
