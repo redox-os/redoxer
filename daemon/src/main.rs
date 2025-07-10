@@ -5,13 +5,53 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::os::unix::io::{FromRawFd, IntoRawFd, RawFd};
 use std::process::{Child, Command, ExitStatus, Stdio};
-use syscall::{Io, Pio};
+use syscall::{Io, Pio, ProcSchemeVerb};
 
 const DEFAULT_COLS: u32 = 80;
 const DEFAULT_LINES: u32 = 30;
 
 fn syscall_error(error: syscall::Error) -> io::Error {
     io::Error::from_raw_os_error(error.errno)
+}
+
+extern "C" {
+    fn redox_cur_thrfd_v0() -> usize;
+
+    fn redox_sys_call_v0(
+        fd: usize,
+        payload: *mut u8,
+        payload_len: usize,
+        flags: usize,
+        metadata: *const u64,
+        metadata_len: usize,
+    ) -> usize;
+}
+
+unsafe fn sys_call<T>(
+    fd: usize,
+    payload: &mut T,
+    flags: usize,
+    metadata: &[u64],
+) -> libredox::error::Result<usize> {
+    libredox::error::Error::demux(redox_sys_call_v0(
+        fd,
+        payload as *mut T as *mut u8,
+        std::mem::size_of::<T>(),
+        flags,
+        metadata.as_ptr(),
+        metadata.len(),
+    ))
+}
+
+// TODO: Copied from drivers repo, so:
+//   a. this function should be moved to libredox
+//   b. move the qemu test driver part to drivers repo and let redoxerd communicate with that driver instead
+fn acquire_port_io_rights() -> io::Result<()> {
+    let kernel_fd = syscall::dup(unsafe { redox_cur_thrfd_v0() }, b"open_via_dup").map_err(syscall_error)?;
+    let res = unsafe { sys_call::<[u8; 0]>(kernel_fd, &mut [], 0, &[ProcSchemeVerb::Iopl as u64]) };
+    let _ = syscall::close(kernel_fd);
+    res?;
+    Ok(())
 }
 
 pub fn handle(event_file: &mut File, master_fd: RawFd, timeout_fd: RawFd, process: &mut Child) -> io::Result<ExitStatus> {
@@ -77,7 +117,7 @@ pub fn handle(event_file: &mut File, master_fd: RawFd, timeout_fd: RawFd, proces
 }
 
 pub fn getpty(columns: u32, lines: u32) -> io::Result<(RawFd, String)> {
-    let master = syscall::open("pty:", syscall::O_CLOEXEC | syscall::O_RDWR | syscall::O_CREAT | syscall::O_NONBLOCK)
+    let master = syscall::open("/scheme/pty", syscall::O_CLOEXEC | syscall::O_RDWR | syscall::O_CREAT | syscall::O_NONBLOCK)
         .map_err(syscall_error)?;
 
     if let Ok(winsize_fd) = syscall::dup(master, b"winsize") {
@@ -94,7 +134,7 @@ pub fn getpty(columns: u32, lines: u32) -> io::Result<(RawFd, String)> {
 }
 
 fn inner() -> io::Result<()> {
-    unsafe { syscall::iopl(3).map_err(syscall_error)?; }
+    acquire_port_io_rights()?;
 
     let config = fs::read_to_string("/etc/redoxerd")?;
     let mut config_lines = config.lines();
@@ -102,13 +142,13 @@ fn inner() -> io::Result<()> {
     let (columns, lines) = (DEFAULT_COLS, DEFAULT_LINES);
     let (master_fd, pty) = getpty(columns, lines)?;
 
-    let timeout_fd = syscall::open("time:4", syscall::O_CLOEXEC | syscall::O_RDWR | syscall::O_NONBLOCK)
+    let timeout_fd = syscall::open("/scheme/time/4", syscall::O_CLOEXEC | syscall::O_RDWR | syscall::O_NONBLOCK)
         .map_err(syscall_error)? as RawFd;
 
     let mut event_file = OpenOptions::new()
         .read(true)
         .write(true)
-        .open("event:")?;
+        .open("/scheme/event")?;
 
     event_file.write(&syscall::Event {
         id: master_fd as usize,
