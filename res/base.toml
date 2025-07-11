@@ -45,6 +45,8 @@ prompt = false
 
 [packages.relibc]
 
+[packages.userutils]
+
 [packages.uutils]
 
 [[files]]
