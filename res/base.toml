@@ -302,7 +302,6 @@ recursive_chown = false
 path = "/usr/lib/init.d/10_net"
 data = """
 smolnetd
-dnsd
 dhcpd -b
 """
 symlink = false
@@ -349,7 +348,6 @@ recursive_chown = false
 path = "/usr/lib/init.d/10_net"
 data = """
 smolnetd
-dnsd
 dhcpd
 """
 symlink = false
