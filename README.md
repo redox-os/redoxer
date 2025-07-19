@@ -18,6 +18,13 @@ cargo install redoxer
 redoxer toolchain
 ```
 
+- Update the Redox toolchain using prebuilt toolchain from existing Redox OS Repo
+
+```sh
+make prefix/x86_64-unknown-redox/relibc-install.tar.gz
+redoxer toolchain --update --url .
+```
+
 - Build the Rust program or library with Redoxer
 
 ```sh
