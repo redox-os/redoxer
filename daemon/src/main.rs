@@ -1,6 +1,6 @@
 use anyhow::Context;
-use std::fs::{self, File, OpenOptions};
-use std::io::{self, Read, Write};
+use std::fs::{self, OpenOptions};
+use std::io;
 use std::os::unix::io::{FromRawFd, IntoRawFd, RawFd};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use syscall::{Io, Pio, ProcSchemeVerb};
@@ -53,49 +53,54 @@ fn acquire_port_io_rights() -> io::Result<()> {
     Ok(())
 }
 
-pub fn handle(
-    event_file: &mut File,
+event::user_data! {
+    enum EventData {
+        Pty,
+        Timer,
+    }
+}
+
+fn handle(
+    event_queue: event::EventQueue<EventData>,
     master_fd: RawFd,
     timeout_fd: RawFd,
     process: &mut Child,
 ) -> io::Result<ExitStatus> {
-    let handle_event = |event_id: RawFd| -> io::Result<bool> {
-        if event_id == master_fd {
-            let mut packet = [0; 4096];
-            loop {
-                // Read data from PTY master
-                let count = match syscall::read(master_fd as usize, &mut packet) {
-                    Ok(0) => return Ok(false),
-                    Ok(count) => count,
-                    Err(ref err) if err.errno == syscall::EAGAIN => return Ok(true),
-                    Err(err) => return Err(syscall_error(err)),
-                };
+    let handle_event = |event: EventData| -> io::Result<bool> {
+        match event {
+            EventData::Pty => {
+                let mut packet = [0; 4096];
+                loop {
+                    // Read data from PTY master
+                    let count = match syscall::read(master_fd as usize, &mut packet) {
+                        Ok(0) => return Ok(false),
+                        Ok(count) => count,
+                        Err(ref err) if err.errno == syscall::EAGAIN => return Ok(true),
+                        Err(err) => return Err(syscall_error(err)),
+                    };
 
-                // Write data to stdout
-                syscall::write(1, &packet[1..count]).map_err(syscall_error)?;
+                    // Write data to stdout
+                    syscall::write(1, &packet[1..count]).map_err(syscall_error)?;
 
-                for i in 1..count {
-                    // Write byte to QEMU debugcon (Bochs compatible)
-                    Pio::<u8>::new(0xe9).write(packet[i]);
+                    for i in 1..count {
+                        // Write byte to QEMU debugcon (Bochs compatible)
+                        Pio::<u8>::new(0xe9).write(packet[i]);
+                    }
                 }
             }
-        } else if event_id == timeout_fd {
-            let mut timespec = syscall::TimeSpec::default();
-            syscall::read(timeout_fd as usize, &mut timespec).map_err(syscall_error)?;
+            EventData::Timer => {
+                let mut timespec = syscall::TimeSpec::default();
+                syscall::read(timeout_fd as usize, &mut timespec).map_err(syscall_error)?;
 
-            timespec.tv_sec += 1;
-            syscall::write(timeout_fd as usize, &mut timespec).map_err(syscall_error)?;
+                timespec.tv_sec += 1;
+                syscall::write(timeout_fd as usize, &mut timespec).map_err(syscall_error)?;
 
-            Ok(true)
-        } else {
-            Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("unexpected event id {}", event_id),
-            ))
+                Ok(true)
+            }
         }
     };
 
-    if handle_event(master_fd)? && handle_event(timeout_fd)? {
+    if handle_event(EventData::Pty)? && handle_event(EventData::Timer)? {
         'events: loop {
             match process.try_wait() {
                 Ok(status_opt) => match status_opt {
@@ -108,9 +113,8 @@ pub fn handle(
                 },
             }
 
-            let mut sys_event = syscall::Event::default();
-            event_file.read(&mut sys_event)?;
-            if !handle_event(sys_event.id as RawFd)? {
+            let event = event_queue.next_event()?;
+            if !handle_event(event.user_data)? {
                 break 'events;
             }
         }
@@ -120,7 +124,7 @@ pub fn handle(
     process.wait()
 }
 
-pub fn getpty(columns: u32, lines: u32) -> io::Result<(RawFd, String)> {
+fn getpty(columns: u32, lines: u32) -> io::Result<(RawFd, String)> {
     let master = syscall::open(
         "/scheme/pty",
         syscall::O_CLOEXEC | syscall::O_RDWR | syscall::O_CREAT | syscall::O_NONBLOCK,
@@ -160,22 +164,13 @@ fn inner() -> anyhow::Result<()> {
     )
     .map_err(syscall_error)? as RawFd;
 
-    let mut event_file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open("/scheme/event")?;
-
-    event_file.write(&syscall::Event {
-        id: master_fd as usize,
-        flags: syscall::flag::EVENT_READ,
-        data: 0,
-    })?;
-
-    event_file.write(&syscall::Event {
-        id: timeout_fd as usize,
-        flags: syscall::flag::EVENT_READ,
-        data: 0,
-    })?;
+    let event_queue = event::EventQueue::new()?;
+    event_queue.subscribe(master_fd as usize, EventData::Pty, event::EventFlags::READ)?;
+    event_queue.subscribe(
+        timeout_fd as usize,
+        EventData::Timer,
+        event::EventFlags::READ,
+    )?;
 
     let slave_stdin = OpenOptions::new().read(true).open(&pty)?;
     let slave_stdout = OpenOptions::new().write(true).open(&pty)?;
@@ -202,7 +197,7 @@ fn inner() -> anyhow::Result<()> {
     let mut process = command
         .spawn()
         .with_context(|| format!("Failed to spawn {command:?}"))?;
-    let status = handle(&mut event_file, master_fd, timeout_fd, &mut process)
+    let status = handle(event_queue, master_fd, timeout_fd, &mut process)
         .with_context(|| format!("Failed to run {name}"))?;
     if status.success() {
         Ok(())
@@ -211,7 +206,7 @@ fn inner() -> anyhow::Result<()> {
     }
 }
 
-pub fn main() {
+fn main() {
     match inner() {
         Ok(()) => {
             // Exit with success using qemu device
