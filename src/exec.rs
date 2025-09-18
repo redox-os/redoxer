@@ -104,6 +104,7 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
 
             if fuse && base_tar.exists() {
                 // redoxer in docker was built without kvm, then CI has kvm
+                eprintln!("redoxer: extracting {}", name);
                 Command::new("tar")
                     .arg("-x")
                     .arg("-p")
@@ -129,6 +130,7 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
         }
 
         if !fuse {
+            eprintln!("redoxer: compressing {}", name);
             Command::new("tar")
                 .arg("-c")
                 .arg("-p")
