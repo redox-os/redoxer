@@ -1,4 +1,5 @@
 use redoxfs::{archive_at, DiskSparse, FileSystem, TreePtr, BLOCK_SIZE};
+use std::collections::HashSet;
 use std::env::VarError;
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
@@ -9,7 +10,7 @@ use crate::redoxfs::RedoxFs;
 use crate::{installed, redoxer_dir, status_error, syscall_error};
 
 const BOOTLOADER_SIZE: usize = 2 * 1024 * 1024;
-const DISK_SIZE: u64 = 2 * 1024 * 1024 * 1024;
+const DISK_SIZE: u64 = 3 * 1024 * 1024 * 1024;
 
 static BASE_TOML: &'static str = include_str!("../res/base.toml");
 static GUI_TOML: &'static str = include_str!("../res/gui.toml");
@@ -55,6 +56,7 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
     let ext = if fuse { "bin" } else { "tar" };
 
     let base_bin = redoxer_dir().join(format!("{}.{}", name, ext));
+    let base_tar = redoxer_dir().join(format!("{}.{}", name, "tar"));
     if !base_bin.is_file() {
         eprintln!("redoxer: building {}", name);
 
@@ -100,13 +102,26 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
                 None
             };
 
-            let config: redox_installer::Config =
-                toml::from_str(if gui { GUI_TOML } else { BASE_TOML })
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
+            if fuse && base_tar.exists() {
+                // redoxer in docker was built without kvm, then CI has kvm
+                Command::new("tar")
+                    .arg("-x")
+                    .arg("-p")
+                    .arg("-f")
+                    .arg(&base_tar)
+                    .arg("-C")
+                    .arg(&base_dir)
+                    .status()
+                    .and_then(status_error)?;
+            } else {
+                let config: redox_installer::Config =
+                    toml::from_str(if gui { GUI_TOML } else { BASE_TOML })
+                        .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
 
-            let cookbook: Option<&str> = None;
-            redox_installer::install(config, &base_dir, cookbook, INSTALL_LIVE_IMAGE, None)
-                .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
+                let cookbook: Option<&str> = None;
+                redox_installer::install(config, &base_dir, cookbook, INSTALL_LIVE_IMAGE, None)
+                    .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
+            }
 
             if let Some(mut redoxfs) = redoxfs_opt {
                 redoxfs.unmount()?;
@@ -207,8 +222,46 @@ fn archive_free_space(
 
 struct RedoxerConfig {
     qemu_binary: Option<String>,
+    qemu_args: Option<String>,
     fuse: Option<bool>,
     // TODO: gui: bool, or generalize it into any config TOML
+}
+
+fn apply_qemu_args(cmd: &mut Command, default: Vec<&str>, args_opt: Option<Vec<&str>>) {
+    let final_args = if let Some(user_args) = args_opt {
+        let user_opts: HashSet<&str> = user_args
+            .iter()
+            .filter(|arg| arg.starts_with('-'))
+            .copied()
+            .collect();
+
+        let mut merged_args: Vec<String> = Vec::new();
+        let mut i = 0;
+        while i < default.len() {
+            let opt = &default[i];
+            if !opt.starts_with('-') {
+                continue; // shouldn't go here
+            }
+
+            let is_single_flag = default.get(i + 1).map_or(true, |a| a.starts_with('-'));
+
+            if !user_opts.contains(opt) {
+                merged_args.push(opt.to_string());
+                if !is_single_flag {
+                    merged_args.push(default[i + 1].to_string());
+                }
+            }
+
+            i += if is_single_flag { 1 } else { 2 };
+        }
+
+        merged_args.extend(user_args.into_iter().map(String::from));
+        merged_args
+    } else {
+        default.into_iter().map(String::from).collect()
+    };
+
+    cmd.args(final_args);
 }
 
 fn inner(
@@ -330,36 +383,47 @@ fn inner(
         let redoxer_log = tempdir.path().join("redoxer.log");
         let mut command = Command::new(qemu_binary);
 
-        // TODO: Support configuring these options
-        command
-            .arg("-cpu")
-            .arg("max")
-            .arg("-machine")
-            .arg("q35")
-            .arg("-m")
-            .arg("2048")
-            .arg("-smp")
-            .arg("4")
-            .arg("-serial")
-            .arg("mon:stdio")
-            .arg("-chardev")
-            .arg(format!("file,id=log,path={}", redoxer_log.display()))
-            .arg("-device")
-            .arg("isa-debugcon,chardev=log")
-            .arg("-device")
-            .arg("isa-debug-exit")
-            .arg("-netdev")
-            .arg("user,id=net0")
-            .arg("-device")
-            .arg("e1000,netdev=net0")
-            .arg("-drive")
-            .arg(format!("file={},format=raw", redoxer_bin.display()));
+        let chardev = format!("file,id=log,path={}", redoxer_log.display());
+        let drive = format!("file={},format=raw", redoxer_bin.display());
+        let mut default_args = vec![
+            "-cpu",
+            "max",
+            "-machine",
+            "q35",
+            "-m",
+            "2048",
+            "smp",
+            "4",
+            "-serial",
+            "mon:stdio",
+            "-chardev",
+            &chardev,
+            "-netdev",
+            "user,id=net0",
+            "-device",
+            "isa-debugcon,chardev=log",
+            "-device",
+            "isa-debug-exit",
+            "-device",
+            "e1000,netdev=net0",
+            "-drive",
+            &drive,
+        ];
         if kvm {
-            command.arg("-accel").arg("kvm");
+            default_args.push("-accel");
+            default_args.push("kvm");
         }
         if !gui {
-            command.arg("-nographic").arg("-vga").arg("none");
+            default_args.push("-nographic");
+            default_args.push("-vga");
+            default_args.push("none");
         }
+
+        apply_qemu_args(
+            &mut command,
+            default_args,
+            config.qemu_args.as_ref().map(|s| s.split(" ").collect()),
+        );
 
         let status = command.status()?;
 
@@ -413,34 +477,20 @@ pub fn main(args: &[String]) {
 
     let mut args = args.iter().cloned().skip(2);
     while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "-f" | "--folder" if matching => match args.next() {
-                Some(folder) => {
-                    folder_opt = Some(folder);
-                }
-                None => {
-                    usage();
-                }
+        match (arg.as_str(), matching) {
+            ("-f" | "--folder", true) => match args.next() {
+                Some(folder) => folder_opt = Some(folder),
+                None => usage(),
             },
-            "-g" | "--gui" if matching => {
-                gui = true;
-            }
+            ("-g" | "--gui", true) => gui = true,
             // TODO: argument for replacing the folder path with /root when found in arguments
-            "-h" | "--help" if matching => {
-                usage();
-            }
-            "-o" | "--output" if matching => match args.next() {
-                Some(output) => {
-                    output_opt = Some(output);
-                }
-                None => {
-                    usage();
-                }
+            ("-h" | "--help", true) => usage(),
+            ("-o" | "--output", true) => match args.next() {
+                Some(output) => output_opt = Some(output),
+                None => usage(),
             },
             // TODO: "-p" | "--package"
-            "--" if matching => {
-                matching = false;
-            }
+            ("--", true) => matching = false,
             _ => {
                 matching = false;
                 arguments.push(arg);
@@ -464,6 +514,7 @@ pub fn main(args: &[String]) {
     }
     let config = RedoxerConfig {
         qemu_binary: var("REDOXER_QEMU_BINARY").ok(),
+        qemu_args: var("REDOXER_QEMU_ARGS").ok(),
         fuse: parse_bool_env("REDOXER_USE_FUSE"),
     };
 
