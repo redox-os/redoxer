@@ -385,29 +385,19 @@ fn inner(
 
         let chardev = format!("file,id=log,path={}", redoxer_log.display());
         let drive = format!("file={},format=raw", redoxer_bin.display());
+        #[rustfmt::skip]
         let mut default_args = vec![
-            "-cpu",
-            "max",
-            "-machine",
-            "q35",
-            "-m",
-            "2048",
-            "smp",
-            "4",
-            "-serial",
-            "mon:stdio",
-            "-chardev",
-            &chardev,
-            "-netdev",
-            "user,id=net0",
-            "-device",
-            "isa-debugcon,chardev=log",
-            "-device",
-            "isa-debug-exit",
-            "-device",
-            "e1000,netdev=net0",
-            "-drive",
-            &drive,
+            "-cpu", "max",
+            "-machine", "q35", 
+            "-m", "2048",
+            "-smp", "4",
+            "-serial", "mon:stdio",
+            "-chardev", &chardev,
+            "-netdev", "user,id=net0",
+            "-device", "isa-debugcon,chardev=log",
+            "-device", "isa-debug-exit",
+            "-device", "e1000,netdev=net0",
+            "-drive", &drive,
         ];
         if kvm {
             default_args.push("-accel");
