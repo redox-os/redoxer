@@ -4,6 +4,31 @@ The tool used to build/run Rust programs (and C/C++ programs with zero dependenc
 
 A pre-built Docker image can be found on [Docker Hub](https://hub.docker.com/r/redoxos/redoxer)
 
+## Options
+
+```
+redoxer <bench | build | check | doc | install | run | rustc | test>
+    Run as cargo passed by `redoxer env cargo`
+    Additionally set `redoxer exec` as test runner
+
+redoxer env <command> [arguments]...
+    Run as command with env configured to run with the toolchain
+    The toolchain will be initialized by `redoxer toolchain`
+
+redoxer exec [-f|--folder folder] [-g|--gui] [-h|--help] [-o|--output file] [--] <command> [arguments]...
+    Run a command inside QEMU, using a redox image
+    The redox image will be initialized if not exist
+    Environment flags:
+        REDOXER_QEMU_BINARY   Override qemu binary
+        REDOXER_QEMU_ARGS     Override qemu args
+        REDOXER_USE_FUSE      [true|false] Override use fuse (default is automatically detected)
+
+redoxer toolchain [--update] [--url PATH]
+    Install or manage toolchain
+    Environment flags:
+        REDOXER_TOOLCHAIN   Override toolchain path
+```
+
 ## Commands
 
 - Install the tool
