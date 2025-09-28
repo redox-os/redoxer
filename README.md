@@ -31,6 +31,14 @@ redoxer toolchain --update --url .
 redoxer build
 ```
 
+- Build the Rust program or library with additional native packages
+
+```sh
+redoxer pkg install xz
+redoxer build
+```
+
+
 - Run the Rust program on Redox
 
 ```sh
