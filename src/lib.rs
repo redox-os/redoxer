@@ -5,6 +5,7 @@ pub(crate) use self::toolchain::toolchain;
 mod cargo;
 mod env;
 mod exec;
+mod pkg;
 mod redoxfs;
 mod toolchain;
 
@@ -50,6 +51,7 @@ fn usage() {
     eprintln!("redoxer env - execute a command in cross-compilation environment");
     eprintln!("redoxer exec - execute a command in Redox VM");
     eprintln!("redoxer install - cargo install with Redox target");
+    eprintln!("redoxer pkg - install sysroot for native dependencies");
     eprintln!("redoxer run - cargo run with Redox target in Redox VM");
     eprintln!("redoxer rustc - cargo rustc with Redox target");
     eprintln!("redoxer test - cargo test with Redox target in Redox VM");
@@ -90,6 +92,7 @@ pub fn main(args: &[String]) {
             }
             "env" => env::main(args),
             "exec" => exec::main(args),
+            "pkg" => pkg::main(args),
             "toolchain" => toolchain::main(args),
             _ => usage(),
         },
