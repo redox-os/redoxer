@@ -10,6 +10,7 @@ edition = "2018"
 [dependencies]
 dirs = "6.0.0"
 redox_installer = "0.2.37"
+redox-pkg = { version = "0.2.5", features = ["indicatif"] }
 redox_syscall = "0.5"
 redoxfs = "0.8"
 tempfile = "3.20.0"

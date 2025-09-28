@@ -1,6 +1,7 @@
 use std::ffi::OsString;
 use std::{env, io, process};
 
+use crate::pkg::get_sysroot;
 use crate::{status_error, target, toolchain};
 
 fn inner<I: Iterator<Item = String>>(mut args: I) -> io::Result<()> {
@@ -16,12 +17,22 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> io::Result<()> {
         env::set_var("PATH", new_path);
     }
 
-    // TODO: Ensure no spaces in toolchain_dir
-    let rustflags = format!(
-        "{} -L native={}",
-        env::var("RUSTFLAGS").unwrap_or_default(),
+    // Use CARGO_ENCODED_RUSTFLAGS to handle spaces
+    let mut rustflags = format!(
+        "{}\x1f-L\x1fnative={}",
+        env::var("RUSTFLAGS")
+            .unwrap_or_default()
+            .replace(" ", "\x1f"),
         toolchain_dir.join(target()).join("lib").display()
     );
+
+    if let Some(sysroot) = get_sysroot() {
+        rustflags = format!(
+            "{}\x1f-L\x1fnative={}",
+            rustflags,
+            sysroot.join("lib").canonicalize()?.display()
+        );
+    }
 
     let command = args.next().unwrap();
     let subcommand = args.next().unwrap();
@@ -69,7 +80,7 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> io::Result<()> {
         .arg(target())
         .args(arguments)
         .env("CARGO_TARGET_X86_64_UNKNOWN_REDOX_RUNNER", runner)
-        .env("RUSTFLAGS", rustflags)
+        .env("CARGO_ENCODED_RUSTFLAGS", rustflags)
         .status()
         .and_then(status_error)?;
 

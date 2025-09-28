@@ -1,6 +1,6 @@
 use std::{env, ffi, io, process};
 
-use crate::{gnu_target, status_error, target, toolchain};
+use crate::{gnu_target, pkg::get_sysroot, status_error, target, toolchain};
 
 pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> io::Result<process::Command> {
     let toolchain_dir = toolchain()?;
@@ -29,7 +29,22 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> io::Result<process::Command>
     command.env("RUSTUP_TOOLCHAIN", &toolchain_dir);
     command.env("TARGET", target());
     command.env("GNU_TARGET", gnu_target());
-    command.env("CFLAGS_riscv64gc_unknown_redox", "-march=rv64gc -mabi=lp64d");
+    command.env(
+        "CFLAGS_riscv64gc_unknown_redox",
+        "-march=rv64gc -mabi=lp64d",
+    );
+
+    if let Some(sysroot) = get_sysroot() {
+        // pkg-config crate specific
+        command.env(
+            format!("PKG_CONFIG_PATH_{}", cc_target_var),
+            sysroot.join("lib/pkgconfig"),
+        );
+        command.env(
+            format!("PKG_CONFIG_SYSROOT_DIR_{}", cc_target_var),
+            &sysroot,
+        );
+    }
 
     Ok(command)
 }
