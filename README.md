@@ -23,6 +23,12 @@ redoxer exec [-f|--folder folder] [-g|--gui] [-h|--help] [-o|--output file] [--]
         REDOXER_QEMU_ARGS     Override qemu args
         REDOXER_USE_FUSE      [true|false] Override use fuse (default is automatically detected)
 
+redoxer pkg [install|remove|update] pkg-1 pkg-2 ...
+    Install additional native packages for Cargo
+    Environment flags:
+        REDOXER_SYSROOT     Where to install sysroot (default is target/$TARGET/sysroot on Cargo projects)
+        REDOXER_PKG_SOURCE  Override source of packages (default is https://static.redox-os.org/pkg)
+
 redoxer toolchain [--update] [--url PATH]
     Install or manage toolchain
     Environment flags:
@@ -55,6 +61,14 @@ redoxer toolchain --update --url .
 ```sh
 redoxer build
 ```
+
+- Build the Rust program or library with additional native packages
+
+```sh
+redoxer pkg install xz
+redoxer build
+```
+
 
 - Run the Rust program on Redox
 
