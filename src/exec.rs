@@ -1,3 +1,4 @@
+use anyhow::Context;
 use redoxfs::{archive_at, DiskSparse, FileSystem, TreePtr, BLOCK_SIZE};
 use std::collections::HashSet;
 use std::env::VarError;
@@ -272,7 +273,7 @@ fn inner(
     folder_opt: Option<String>,
     gui: bool,
     output_opt: Option<String>,
-) -> io::Result<i32> {
+) -> anyhow::Result<i32> {
     let qemu_binary = config
         .qemu_binary
         .as_deref()
@@ -298,10 +299,10 @@ fn inner(
         process::exit(1);
     }
 
-    let bootloader_bin = bootloader()?;
-    let base_bin = base(&bootloader_bin, gui, fuse)?;
+    let bootloader_bin = bootloader().context("unable to init bootloader")?;
+    let base_bin = base(&bootloader_bin, gui, fuse).context("unable to init base")?;
 
-    let tempdir = tempfile::tempdir()?;
+    let tempdir = tempfile::tempdir().context("unable to create tempdir")?;
 
     let code = {
         let redoxer_bin = tempdir.path().join("redoxer.bin");
@@ -310,15 +311,16 @@ fn inner(
                 .arg(&base_bin)
                 .arg(&redoxer_bin)
                 .status()
-                .and_then(status_error)?;
+                .and_then(status_error)
+                .context("copy base to redoxer bin failed")?;
         }
 
         let redoxer_dir = tempdir.path().join("redoxer");
-        fs::create_dir_all(&redoxer_dir)?;
+        fs::create_dir_all(&redoxer_dir).context("unable to create redoxer dir")?;
 
         {
             let redoxfs_opt = if fuse {
-                Some(RedoxFs::new(&redoxer_bin, &redoxer_dir)?)
+                Some(RedoxFs::new(&redoxer_bin, &redoxer_dir).context("unable to init redoxfs")?)
             } else {
                 Command::new("tar")
                     .arg("-x")
@@ -330,7 +332,8 @@ fn inner(
                     .arg(&redoxer_dir)
                     .arg(".")
                     .status()
-                    .and_then(status_error)?;
+                    .and_then(status_error)
+                    .context("tar failed")?;
                 None
             };
 
@@ -339,7 +342,8 @@ fn inner(
                 // Replace absolute path to folder with /root in command name
                 // TODO: make this activated by a flag
                 if let Some(ref folder) = folder_opt {
-                    let folder_canonical_path = fs::canonicalize(&folder)?;
+                    let folder_canonical_path =
+                        fs::canonicalize(&folder).context("unable to canonalize")?;
                     let folder_canonical = folder_canonical_path.to_str().ok_or(io::Error::new(
                         io::ErrorKind::Other,
                         "folder path is not valid UTF-8",
@@ -359,7 +363,8 @@ fn inner(
                 redoxerd_config.push_str(&arg);
                 redoxerd_config.push('\n');
             }
-            fs::write(redoxer_dir.join("etc/redoxerd"), redoxerd_config)?;
+            fs::write(redoxer_dir.join("etc/redoxerd"), redoxerd_config)
+                .context("unable to write redoxerd config")?;
 
             if let Some(ref folder) = folder_opt {
                 eprintln!("redoxer: copying '{}' to '/root'", folder);
@@ -370,11 +375,12 @@ fn inner(
                     .arg(&folder)
                     .arg(&root_dir)
                     .status()
-                    .and_then(status_error)?;
+                    .and_then(status_error)
+                    .context("rsync failed")?;
             }
 
             if let Some(mut redoxfs) = redoxfs_opt {
-                redoxfs.unmount()?;
+                redoxfs.unmount().context("unable to unmount")?;
             }
         }
 
@@ -417,7 +423,7 @@ fn inner(
             config.qemu_args.as_ref().map(|s| s.split(" ").collect()),
         );
 
-        let status = command.status()?;
+        let status = command.status().context("unable to get redoxer status")?;
 
         eprintln!();
 
@@ -515,7 +521,7 @@ pub fn main(args: &[String]) {
             process::exit(code);
         }
         Err(err) => {
-            eprintln!("redoxer exec: {}", err);
+            eprintln!("redoxer exec: {:#}", err);
             process::exit(3);
         }
     }
