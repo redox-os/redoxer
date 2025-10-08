@@ -44,8 +44,8 @@ fn toolchain_inner(is_update: bool, source_url: String) -> io::Result<PathBuf> {
 
     let source_is_remote = source_url.starts_with("http://") || source_url.starts_with("https://");
     let url = match source_is_remote {
-        true =>  format!("{}/toolchain/{}", source_url, target()),
-        false =>  format!("{}/prefix/{}", source_url, target()),
+        true => format!("{}/toolchain/{}", source_url, target()),
+        false => format!("{}/prefix/{}", source_url, target()),
     };
     let toolchain_dir = redoxer_dir().join("toolchain");
     if is_update && toolchain_dir.is_dir() {
@@ -95,7 +95,6 @@ fn toolchain_inner(is_update: bool, source_url: String) -> io::Result<PathBuf> {
                 .arg(&toolchain_partial)
                 .status()
                 .and_then(status_error)?;
-
         }
 
         fs::rename(&toolchain_partial, &toolchain_dir)?;
@@ -109,7 +108,6 @@ pub fn toolchain() -> io::Result<PathBuf> {
 }
 
 pub fn main(args: &[String]) {
-
     let mut is_update = false;
     let mut source_url: String = String::from(DEFAULT_TOOLCHAIN_SOURCE);
     let args: Vec<String> = args.iter().cloned().skip(2).collect();
@@ -120,7 +118,10 @@ pub fn main(args: &[String]) {
             "--help" => {
                 eprintln!("redoxer toolchain [--update] [--url PATH]");
                 eprintln!("  --update     update existing toolchain");
-                eprintln!("  --url PATH   use PATH as source URL instead of {}", DEFAULT_TOOLCHAIN_SOURCE);
+                eprintln!(
+                    "  --url PATH   use PATH as source URL instead of {}",
+                    DEFAULT_TOOLCHAIN_SOURCE
+                );
                 eprintln!("               PATH can be a local path (to copy) or http(s) URL (to download)");
                 eprintln!("               local PATH is used to update relibc inside redoxer");
                 process::exit(0);
