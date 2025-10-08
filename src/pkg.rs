@@ -118,7 +118,10 @@ pub fn get_sysroot() -> Option<PathBuf> {
         .map(|p| Path::new(&p).to_owned())
         .or_else(|| {
             if Path::new("Cargo.toml").is_file() {
-                return Some(Path::new(&format!("target/{}/sysroot", target())).to_path_buf());
+                let path = Path::new(&format!("target/{}/sysroot", target())).to_path_buf();
+                if path.join("lib").is_dir() {
+                    return Some(path);
+                }
             }
             return None;
         })
