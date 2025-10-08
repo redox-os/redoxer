@@ -19,12 +19,13 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> io::Result<()> {
 
     // Use CARGO_ENCODED_RUSTFLAGS to handle spaces
     let mut rustflags = format!(
-        "{}\x1f-L\x1fnative={}",
-        env::var("RUSTFLAGS")
-            .unwrap_or_default()
-            .replace(" ", "\x1f"),
+        "-L\x1fnative={}",
         toolchain_dir.join(target()).join("lib").display()
     );
+
+    if let Ok(user_rustflag) = env::var("RUSTFLAGS") {
+        rustflags = format!("{}\x1f{}", rustflags, user_rustflag.replace(" ", "\x1f"));
+    }
 
     if let Some(sysroot) = get_sysroot() {
         rustflags = format!(

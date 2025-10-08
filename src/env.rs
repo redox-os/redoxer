@@ -1,17 +1,18 @@
-use std::{env, ffi, io, process};
+use std::{env, ffi, process};
+
+use anyhow::Context;
 
 use crate::{gnu_target, pkg::get_sysroot, status_error, target, toolchain};
 
-pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> io::Result<process::Command> {
-    let toolchain_dir = toolchain()?;
+pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Command> {
+    let toolchain_dir = toolchain().context("unable to init toolchain")?;
 
     // PATH must be set first so cargo is sourced from the toolchain path
     {
         let path = env::var_os("PATH").unwrap_or(ffi::OsString::new());
         let mut paths = env::split_paths(&path).collect::<Vec<_>>();
         paths.insert(0, toolchain_dir.join("bin"));
-        let new_path =
-            env::join_paths(paths).map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+        let new_path = env::join_paths(paths)?;
         env::set_var("PATH", new_path);
     }
 
@@ -49,7 +50,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> io::Result<process::Command>
     Ok(command)
 }
 
-fn inner<I: Iterator<Item = String>>(args: I) -> io::Result<()> {
+fn inner<I: Iterator<Item = String>>(args: I) -> anyhow::Result<()> {
     command("env")?.args(args).status().and_then(status_error)?;
 
     Ok(())
@@ -61,7 +62,7 @@ pub fn main(args: &[String]) {
             process::exit(0);
         }
         Err(err) => {
-            eprintln!("redoxer env: {}", err);
+            eprintln!("redoxer env: {:#}", err);
             process::exit(1);
         }
     }
