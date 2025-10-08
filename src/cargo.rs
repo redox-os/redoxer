@@ -4,7 +4,7 @@ use std::{env, io, process};
 use crate::pkg::get_sysroot;
 use crate::{status_error, target, toolchain};
 
-fn inner<I: Iterator<Item = String>>(mut args: I) -> io::Result<()> {
+fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
     let toolchain_dir = toolchain()?;
 
     // PATH must be set first so cargo is sourced from the toolchain path
