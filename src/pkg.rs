@@ -93,16 +93,7 @@ pub fn main(args: &[String]) {
     }
 
     let sysroot = get_sysroot()
-        .or_else(|| {
-            if let Some(cargo_sysroot) = get_cargo_sysroot_default_path() {
-                fs::create_dir_all(cargo_sysroot.join("lib")).expect(&format!(
-                    "unable to create sysroot dir at {}",
-                    cargo_sysroot.display()
-                ));
-                return Some(cargo_sysroot);
-            }
-            None
-        })
+        .or_else(|| get_cargo_sysroot_default_path())
         .expect("Please define REDOXER_SYSROOT as destination to install packages");
 
     let source = env::var("REDOXER_PKG_SOURCE").unwrap_or(DEFAULT_PKG_SOURCE.to_string());
