@@ -91,8 +91,10 @@ pub fn main(args: &[String]) {
     if pkgs.len() == 0 {
         pkg_usage();
     }
-    let sysroot =
-        get_sysroot().expect("Please define REDOXER_SYSROOT as destination to install packages");
+
+    let sysroot = get_sysroot()
+        .or_else(|| get_cargo_sysroot_default_path())
+        .expect("Please define REDOXER_SYSROOT as destination to install packages");
 
     let source = env::var("REDOXER_PKG_SOURCE").unwrap_or(DEFAULT_PKG_SOURCE.to_string());
 
@@ -117,14 +119,20 @@ pub fn get_sysroot() -> Option<PathBuf> {
         .ok()
         .map(|p| Path::new(&p).to_owned())
         .or_else(|| {
-            if Path::new("Cargo.toml").is_file() {
-                let path = Path::new(&format!("target/{}/sysroot", target())).to_path_buf();
-                if path.join("lib").is_dir() {
-                    return Some(path);
-                }
+            let path = get_cargo_sysroot_default_path()?;
+            if path.join("lib").is_dir() {
+                return Some(path);
             }
             return None;
         })
+}
+
+fn get_cargo_sysroot_default_path() -> Option<PathBuf> {
+    if Path::new("Cargo.toml").is_file() {
+        Some(Path::new(&format!("target/{}/sysroot", target())).to_path_buf())
+    } else {
+        None
+    }
 }
 
 fn pkg_usage() {
