@@ -91,9 +91,8 @@ pub fn gnu_target() -> &'static str {
 pub fn main(args: &[String]) {
     match args.get(1) {
         Some(arg) => match arg.as_str() {
-            "bench" | "build" | "check" | "doc" | "fetch" | "install" | "run" | "rustc" | "test" => {
-                cargo::main(args)
-            }
+            "bench" | "build" | "check" | "doc" | "fetch" => cargo::main(args),
+            "install" | "run" | "rustc" | "test" => cargo::main(args),
             "env" => env::main(args),
             "exec" => exec::main(args),
             "pkg" => pkg::main(args),
