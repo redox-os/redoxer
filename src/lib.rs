@@ -51,6 +51,7 @@ fn usage() {
     eprintln!("redoxer doc - cargo doc with Redox target");
     eprintln!("redoxer env - execute a command in cross-compilation environment");
     eprintln!("redoxer exec - execute a command in Redox VM");
+    eprintln!("redoxer fetch - cargo fetch with Redox target");
     eprintln!("redoxer install - cargo install with Redox target");
     eprintln!("redoxer pkg - install sysroot for native dependencies");
     eprintln!("redoxer run - cargo run with Redox target in Redox VM");
@@ -90,7 +91,7 @@ pub fn gnu_target() -> &'static str {
 pub fn main(args: &[String]) {
     match args.get(1) {
         Some(arg) => match arg.as_str() {
-            "bench" | "build" | "check" | "doc" | "install" | "run" | "rustc" | "test" => {
+            "bench" | "build" | "check" | "doc" | "fetch" | "install" | "run" | "rustc" | "test" => {
                 cargo::main(args)
             }
             "env" => env::main(args),
