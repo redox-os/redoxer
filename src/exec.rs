@@ -501,9 +501,13 @@ pub fn main(args: &[String]) {
     }
 
     if folder_opt.is_none() {
-        if let Some(cmd) = arguments.get(1) {
+        if let Some(cmd) = arguments.get(0) {
             if Path::new(cmd).is_file() {
-                folder_opt = Some(cmd.to_string());
+                if !cmd.contains('/') {
+                    eprintln!("WARN: Skipping copy, you might mean to run exec with ./{}", cmd)
+                } else {
+                    folder_opt = Some(cmd.to_string());
+                }
             }
         }
     }
