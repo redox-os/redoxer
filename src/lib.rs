@@ -45,9 +45,12 @@ fn syscall_error(err: syscall::Error) -> io::Error {
 }
 
 fn usage() {
+    eprintln!("redoxer ar - run AR GNU compiler with Redox target");
     eprintln!("redoxer bench - cargo bench with Redox target in Redox VM");
     eprintln!("redoxer build - cargo build with Redox target");
+    eprintln!("redoxer cc - run C GNU compiler with Redox target");
     eprintln!("redoxer check - cargo check with Redox target");
+    eprintln!("redoxer cxx - run C++ GNU compiler with Redox target");
     eprintln!("redoxer doc - cargo doc with Redox target");
     eprintln!("redoxer env - execute a command in cross-compilation environment");
     eprintln!("redoxer exec - execute a command in Redox VM");
@@ -93,7 +96,7 @@ pub fn main(args: &[String]) {
         Some(arg) => match arg.as_str() {
             "bench" | "build" | "check" | "doc" | "fetch" => cargo::main(args),
             "install" | "run" | "rustc" | "test" => cargo::main(args),
-            "env" => env::main(args),
+            "ar" | "cc" | "cxx" | "env" => env::main(args),
             "exec" => exec::main(args),
             "pkg" => pkg::main(args),
             "toolchain" => toolchain::main(args),

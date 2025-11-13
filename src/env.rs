@@ -1,6 +1,6 @@
 use std::{env, ffi, process};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 
 use crate::{gnu_target, pkg::get_sysroot, status_error, target, toolchain};
 
@@ -21,6 +21,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     let cxx = format!("{}-g++", gnu_target());
     let cc_target_var = target().replace("-", "_");
     let cargo_target_var = cc_target_var.to_uppercase();
+    let is_cc = program.as_ref() != "env" && program.as_ref() != "cargo";
 
     let mut command = process::Command::new(program);
     command.env(format!("AR_{}", cc_target_var), &ar);
@@ -45,19 +46,55 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
             format!("PKG_CONFIG_SYSROOT_DIR_{}", cc_target_var),
             &sysroot,
         );
+        if is_cc {
+            let includedir = sysroot.join("include").canonicalize()?;
+            let mut cppflags = format!("-I{}", includedir.display());
+
+            if let Ok(user_cppflags) = env::var("CPPFLAGS") {
+                cppflags = format!("{} {}", cppflags, user_cppflags);
+            }
+            if cc_target_var == "riscv64gc_unknown_redox" {
+                // TODO: should be set also without sysroot
+                cppflags = format!("{} -march=rv64gc -mabi=lp64d", cppflags);
+            }
+
+            let libdir = sysroot.join("lib").canonicalize()?;
+            let mut ldflags = format!(
+                "-Wl,-rpath-link,{} -L{}",
+                libdir.display(),
+                libdir.display()
+            );
+
+            if let Ok(user_ldflags) = env::var("LDFLAGS") {
+                ldflags = format!("{} {}", ldflags, user_ldflags);
+            }
+
+            command.env("CPPFLAGS", cppflags);
+            command.env("LDFLAGS", ldflags);
+        }
     }
 
     Ok(command)
 }
 
-fn inner<I: Iterator<Item = String>>(args: I) -> anyhow::Result<()> {
-    command("env")?.args(args).status().and_then(status_error)?;
+fn inner<I: Iterator<Item = String>>(program: &str, args: I) -> anyhow::Result<()> {
+    let program = match program {
+        "env" => "env".to_string(),
+        "ar" => format!("{}-ar", gnu_target()),
+        "cc" => format!("{}-gcc", gnu_target()),
+        "cxx" => format!("{}-g++", gnu_target()),
+        _ => return Err(anyhow!("Unknown env program {:?}", program)),
+    };
+    command(program)?
+        .args(args)
+        .status()
+        .and_then(status_error)?;
 
     Ok(())
 }
 
 pub fn main(args: &[String]) {
-    match inner(args.iter().cloned().skip(2)) {
+    match inner(args.get(1).unwrap(), args.iter().cloned().skip(2)) {
         Ok(()) => {
             process::exit(0);
         }
