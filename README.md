@@ -7,17 +7,24 @@ A pre-built Docker image can be found on [Docker Hub](https://hub.docker.com/r/r
 ## Options
 
 ```
-redoxer <bench | build | check | doc | install | run | rustc | test>
-    Run as cargo passed by `redoxer env cargo`
-    Additionally set `redoxer exec` as test runner
-
 redoxer env <command> [arguments]...
     Run as command with env configured to run with the toolchain
     The toolchain will be initialized by `redoxer toolchain`
+    Environment flags:
+        REDOXER_SYSROOT      Specify sysroot to link (default is target/$TARGET/sysroot on Cargo projects)
+
+redoxer <bench | build | check | doc | fetch | install | run | rustc | test> [-g|--gui] [-o|--output file] [--] [arguments]
+    Run as cargo passed by `redoxer env cargo`
+    Additionally set `redoxer exec` as test runner
+
+redoxer <ar | cc | cxx> [arguments]
+    Run as GNU compiler passed by `redoxer env $GNU_TARGET-*`
 
 redoxer exec [-f|--folder folder] [-g|--gui] [-h|--help] [-o|--output file] [--] <command> [arguments]...
     Run a command inside QEMU, using a redox image
     The redox image will be initialized if not exist
+    Specify a folder to copy it into /root inside redox image
+    If folder is not specified but <command> is a file, the file will be copied
     Environment flags:
         REDOXER_QEMU_BINARY   Override qemu binary
         REDOXER_QEMU_ARGS     Override qemu args

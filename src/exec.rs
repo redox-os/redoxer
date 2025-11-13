@@ -500,6 +500,21 @@ pub fn main(args: &[String]) {
         usage();
     }
 
+    if folder_opt.is_none() {
+        if let Some(cmd) = arguments.get(0) {
+            if Path::new(cmd).is_file() {
+                if !cmd.contains('/') {
+                    eprintln!(
+                        "WARN: Skipping copy, you might mean to run exec with ./{}",
+                        cmd
+                    )
+                } else {
+                    folder_opt = Some(cmd.to_string());
+                }
+            }
+        }
+    }
+
     use std::env::var;
     fn parse_bool_env(name: &str) -> Option<bool> {
         match var(name).as_deref() {
