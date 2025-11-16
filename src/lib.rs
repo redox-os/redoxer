@@ -84,8 +84,6 @@ pub fn gnu_target() -> &'static str {
     let rust_target = target();
     if rust_target == "riscv64gc-unknown-redox" {
         "riscv64-unknown-redox"
-    } else if rust_target == "i586-unknown-redox" {
-        "i686-unknown-redox"
     } else {
         rust_target
     }
