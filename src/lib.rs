@@ -91,6 +91,26 @@ pub fn gnu_target() -> &'static str {
     }
 }
 
+pub fn host_target() -> &'static str {
+    let os = if cfg!(target_os = "linux") {
+        "linux-gnu"
+    } else {
+        ""
+    };
+    let arch = if cfg!(target_arch = "x86_64") {
+        "x86_64"
+    } else if cfg!(target_arch = "aarch64") {
+        "aarch64"
+    } else {
+        ""
+    };
+    match (arch, os) {
+        ("x86_64", "linux-gnu") => "x86_64-unknown-linux-gnu",
+        ("aarch64", "linux-gnu") => "aarch64-unknown-linux-gnu",
+        _ => panic!("Unsupported host OS/ARCH!"),
+    }
+}
+
 pub fn main(args: &[String]) {
     match args.get(1) {
         Some(arg) => match arg.as_str() {
