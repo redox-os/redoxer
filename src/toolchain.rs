@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::{env, fs, io};
 
-use crate::{redoxer_dir, status_error, target};
+use crate::{host_target, redoxer_dir, status_error, target};
 
 pub const DEFAULT_TOOLCHAIN_SOURCE: &str = "https://static.redox-os.org";
 
@@ -44,7 +44,7 @@ fn toolchain_inner(is_update: bool, source_url: String) -> io::Result<PathBuf> {
 
     let source_is_remote = source_url.starts_with("http://") || source_url.starts_with("https://");
     let url = match source_is_remote {
-        true => format!("{}/toolchain/{}", source_url, target()),
+        true => format!("{}/toolchain/{}/{}", source_url, host_target(), target()),
         false => format!("{}/prefix/{}", source_url, target()),
     };
     let toolchain_dir = redoxer_dir().join("toolchain");
