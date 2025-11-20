@@ -67,6 +67,11 @@ fn usage() {
 pub fn target() -> &'static str {
     let target_from_env = std::env::var("TARGET").unwrap_or("".to_string());
 
+    // Allow compilation for host if explicitly requested
+    if target_from_env == host_target() {
+        return host_target();
+    }
+
     let index = if SUPPORTED_TARGETS.contains(&&*target_from_env) == true {
         SUPPORTED_TARGETS
             .iter()
