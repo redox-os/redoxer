@@ -97,6 +97,8 @@ pub fn gnu_target() -> &'static str {
 pub fn host_target() -> &'static str {
     let os = if cfg!(target_os = "linux") {
         "linux-gnu"
+    } else if cfg!(target_os = "redox") {
+        "redox"
     } else {
         ""
     };
@@ -110,6 +112,8 @@ pub fn host_target() -> &'static str {
     match (arch, os) {
         ("x86_64", "linux-gnu") => "x86_64-unknown-linux-gnu",
         ("aarch64", "linux-gnu") => "aarch64-unknown-linux-gnu",
+        ("x86_64", "redox") => "x86_64-unknown-redox",
+        ("aarch64", "redox") => "aarch64-unknown-redox",
         _ => panic!("Unsupported host OS/ARCH!"),
     }
 }
