@@ -86,11 +86,11 @@ pub fn target() -> &'static str {
 }
 
 pub fn gnu_target() -> &'static str {
-    let rust_target = target();
-    if rust_target == "riscv64gc-unknown-redox" {
-        "riscv64-unknown-redox"
-    } else {
-        rust_target
+    match target() {
+        "riscv64gc-unknown-redox" => "riscv64-unknown-redox",
+        "aarch64-unknown-linux-gnu" => "aarch64-linux-gnu",
+        "x86_64-unknown-linux-gnu" => "x86_64-linux-gnu",
+        rust_target => rust_target,
     }
 }
 
