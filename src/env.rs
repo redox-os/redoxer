@@ -111,10 +111,18 @@ fn inner<I: Iterator<Item = String>>(program: &str, args: I) -> anyhow::Result<(
 fn generate_gnu_targets() -> HashMap<&'static str, String> {
     let gnu_target = gnu_target();
     let mut h = HashMap::new();
+    let mut cc = format!("{}-gcc", gnu_target);
+    let mut cxx = format!("{}-g++", gnu_target);
+    if let Ok(cc_wrapper) = std::env::var("CC_WRAPPER") {
+        if cc_wrapper.len() > 0 {
+            cc = format!("{cc_wrapper} {cc}");
+            cxx = format!("{cc_wrapper} {cxx}");
+        }
+    }
     h.insert("AR", format!("{}-gcc-ar", gnu_target));
     h.insert("AS", format!("{}-as", gnu_target));
-    h.insert("CC", format!("{}-gcc", gnu_target));
-    h.insert("CXX", format!("{}-g++", gnu_target));
+    h.insert("CC", cc);
+    h.insert("CXX", cxx);
     h.insert("LD", format!("{}-ld", gnu_target));
     h.insert("OBJCOPY", format!("{}-objcopy", gnu_target));
     h.insert("OBJDUMP", format!("{}-objdump", gnu_target));
