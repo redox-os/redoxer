@@ -25,6 +25,14 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
 
     let mut command = process::Command::new(program);
     for (k, v) in gnu_targets.iter() {
+        if *k == "CC" || *k == "CXX" {
+            if let Ok(cc_wrapper) = std::env::var("CC_WRAPPER") {
+                if cc_wrapper.len() > 0 {
+                    command.env(k, format!("{cc_wrapper} {v}"));
+                    continue;
+                }
+            }
+        }
         command.env(k, v);
         command.env(format!("{k}_{cc_target_var}"), &v);
     }
