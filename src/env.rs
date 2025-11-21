@@ -1,4 +1,4 @@
-use std::{env, ffi, process};
+use std::{collections::HashMap, env, ffi, process};
 
 use anyhow::{anyhow, Context};
 
@@ -16,25 +16,40 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
         env::set_var("PATH", new_path);
     }
 
-    let ar = format!("{}-ar", gnu_target());
-    let cc = format!("{}-gcc", gnu_target());
-    let cxx = format!("{}-g++", gnu_target());
-    let cc_target_var = target().replace("-", "_");
+    let target = target();
+    let gnu_target = gnu_target();
+    let gnu_targets = generate_gnu_targets();
+    let cc_target_var = target.replace("-", "_");
     let cargo_target_var = cc_target_var.to_uppercase();
     let is_cc = program.as_ref() != "env" && program.as_ref() != "cargo";
 
     let mut command = process::Command::new(program);
-    command.env(format!("AR_{}", cc_target_var), &ar);
-    command.env(format!("CARGO_TARGET_{}_LINKER", cargo_target_var), &cc);
-    command.env(format!("CC_{}", cc_target_var), &cc);
-    command.env(format!("CXX_{}", cc_target_var), &cxx);
-    command.env("RUSTUP_TOOLCHAIN", &toolchain_dir);
-    command.env("TARGET", target());
-    command.env("GNU_TARGET", gnu_target());
+    for (k, v) in gnu_targets.iter() {
+        command.env(k, v);
+        command.env(format!("{k}_{cc_target_var}"), &v);
+    }
     command.env(
-        "CFLAGS_riscv64gc_unknown_redox",
-        "-march=rv64gc -mabi=lp64d",
+        format!("CARGO_TARGET_{}_LINKER", cargo_target_var),
+        gnu_targets.get("CC").unwrap(),
     );
+    command.env("RUSTUP_TOOLCHAIN", &toolchain_dir);
+    command.env("TARGET", target);
+    command.env("GNU_TARGET", gnu_target);
+    command.env("PKG_CONFIG_FOR_BUILD", "pkg-config");
+    command.env(
+        "FIND",
+        if cfg!(any(target_os = "macos", target_os = "freebsd",)) {
+            "gfind"
+        } else {
+            "find"
+        },
+    );
+    if cc_target_var == "riscv64gc_unknown_redox" {
+        command.env(
+            "CFLAGS_riscv64gc_unknown_redox",
+            "-march=rv64gc -mabi=lp64d",
+        );
+    }
 
     if let Some(sysroot) = get_sysroot() {
         // pkg-config crate specific
@@ -91,6 +106,23 @@ fn inner<I: Iterator<Item = String>>(program: &str, args: I) -> anyhow::Result<(
         .and_then(status_error)?;
 
     Ok(())
+}
+
+fn generate_gnu_targets() -> HashMap<&'static str, String> {
+    let gnu_target = gnu_target();
+    let mut h = HashMap::new();
+    h.insert("AR", format!("{}-gcc-ar", gnu_target));
+    h.insert("AS", format!("{}-as", gnu_target));
+    h.insert("CC", format!("{}-gcc", gnu_target));
+    h.insert("CXX", format!("{}-g++", gnu_target));
+    h.insert("LD", format!("{}-ld", gnu_target));
+    h.insert("OBJCOPY", format!("{}-objcopy", gnu_target));
+    h.insert("OBJDUMP", format!("{}-objdump", gnu_target));
+    h.insert("PKG_CONFIG", format!("{}-pkg-config", gnu_target));
+    h.insert("RANLIB", format!("{}-ranlib", gnu_target));
+    h.insert("READELF", format!("{}-readelf", gnu_target));
+    h.insert("STRIP", format!("{}-strip", gnu_target));
+    h
 }
 
 pub fn main(args: &[String]) {
