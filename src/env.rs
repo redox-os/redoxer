@@ -2,7 +2,7 @@ use std::{collections::HashMap, env, ffi, process};
 
 use anyhow::{anyhow, Context};
 
-use crate::{gnu_target, pkg::get_sysroot, status_error, target, toolchain};
+use crate::{gnu_target, status_error, target, toolchain};
 
 pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Command> {
     let toolchain_dir = toolchain().context("unable to init toolchain")?;
@@ -21,6 +21,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     let gnu_targets = generate_gnu_targets();
     let cc_target_var = target.replace("-", "_");
     let cargo_target_var = cc_target_var.to_uppercase();
+    #[cfg(feature = "cli-pkg")]
     let is_cc = program.as_ref() != "env" && program.as_ref() != "cargo";
 
     let mut command = process::Command::new(program);
@@ -59,7 +60,8 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
         );
     }
 
-    if let Some(sysroot) = get_sysroot() {
+    #[cfg(feature = "cli-pkg")]
+    if let Some(sysroot) = crate::pkg::get_sysroot() {
         // pkg-config crate specific
         command.env(
             format!("PKG_CONFIG_PATH_{}", cc_target_var),

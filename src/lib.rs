@@ -1,11 +1,16 @@
+#[cfg(not(feature = "cli-exec"))]
+use core::panic;
 use std::{io, path, process};
 
 pub(crate) use self::toolchain::toolchain;
 
 mod cargo;
 mod env;
+#[cfg(feature = "cli-exec")]
 mod exec;
+#[cfg(feature = "cli-pkg")]
 mod pkg;
+#[cfg(feature = "cli-exec")]
 mod redoxfs;
 mod toolchain;
 
@@ -16,14 +21,6 @@ const SUPPORTED_TARGETS: &'static [&'static str] = &[
     "i686-unknown-redox",
     "riscv64gc-unknown-redox",
 ];
-
-fn installed(program: &str) -> io::Result<bool> {
-    process::Command::new("which")
-        .arg(program)
-        .stdout(process::Stdio::null())
-        .status()
-        .map(|x| x.success())
-}
 
 fn redoxer_dir() -> path::PathBuf {
     dirs::home_dir()
@@ -38,10 +35,6 @@ fn status_error(status: process::ExitStatus) -> io::Result<()> {
     } else {
         Err(io::Error::new(io::ErrorKind::Other, format!("{}", status)))
     }
-}
-
-fn syscall_error(err: syscall::Error) -> io::Error {
-    io::Error::from_raw_os_error(err.errno)
 }
 
 fn usage() {
@@ -124,8 +117,14 @@ pub fn main(args: &[String]) {
             "bench" | "build" | "check" | "doc" | "fetch" => cargo::main(args),
             "install" | "run" | "rustc" | "test" => cargo::main(args),
             "ar" | "cc" | "cxx" | "env" => env::main(args),
+            #[cfg(feature = "cli-exec")]
             "exec" => exec::main(args),
+            #[cfg(not(feature = "cli-exec"))]
+            "exec" => panic!("feature 'cli-exec' is not compiled"),
+            #[cfg(feature = "cli-pkg")]
             "pkg" => pkg::main(args),
+            #[cfg(not(feature = "cli-pkg"))]
+            "pkg" => panic!("feature 'cli-pkg' is not compiled"),
             "toolchain" => toolchain::main(args),
             _ => usage(),
         },

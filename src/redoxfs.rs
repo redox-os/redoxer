@@ -4,11 +4,15 @@ use std::process::Command;
 use std::sync::mpsc::{channel, TryRecvError};
 use std::{fs, io, thread, time};
 
-use crate::{status_error, syscall_error};
+use crate::status_error;
 
 pub struct RedoxFs {
     image: PathBuf,
     dir: PathBuf,
+}
+
+pub(crate) fn syscall_error(err: syscall::Error) -> io::Error {
+    io::Error::from_raw_os_error(err.errno)
 }
 
 impl RedoxFs {
