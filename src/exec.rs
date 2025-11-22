@@ -7,8 +7,8 @@ use std::process::{self, Command};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io};
 
-use crate::redoxfs::RedoxFs;
-use crate::{installed, redoxer_dir, status_error, syscall_error};
+use crate::redoxfs::{syscall_error, RedoxFs};
+use crate::{redoxer_dir, status_error};
 
 const BOOTLOADER_SIZE: usize = 2 * 1024 * 1024;
 const DISK_SIZE: u64 = 3 * 1024 * 1024 * 1024;
@@ -265,6 +265,14 @@ fn apply_qemu_args(cmd: &mut Command, default: Vec<&str>, args_opt: Option<Vec<&
     };
 
     cmd.args(final_args);
+}
+
+fn installed(program: &str) -> io::Result<bool> {
+    process::Command::new("which")
+        .arg(program)
+        .stdout(process::Stdio::null())
+        .status()
+        .map(|x| x.success())
 }
 
 fn inner(

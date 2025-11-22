@@ -1,7 +1,6 @@
 use std::ffi::OsString;
 use std::{env, io, process};
 
-use crate::pkg::get_sysroot;
 use crate::{status_error, target, toolchain};
 
 fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
@@ -27,7 +26,8 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
         rustflags = format!("{}\x1f{}", rustflags, user_rustflag.replace(" ", "\x1f"));
     }
 
-    if let Some(sysroot) = get_sysroot() {
+    #[cfg(feature = "cli-pkg")]
+    if let Some(sysroot) = crate::pkg::get_sysroot() {
         rustflags = format!(
             "{}\x1f-L\x1fnative={}",
             rustflags,
