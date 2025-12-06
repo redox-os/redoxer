@@ -126,10 +126,11 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
     h.insert("CC", format!("{}-gcc", gnu_target));
     h.insert("CXX", format!("{}-g++", gnu_target));
     h.insert("LD", format!("{}-ld", gnu_target));
+    h.insert("NM", format!("{}-gcc-nm", gnu_target));
     h.insert("OBJCOPY", format!("{}-objcopy", gnu_target));
     h.insert("OBJDUMP", format!("{}-objdump", gnu_target));
     h.insert("PKG_CONFIG", format!("{}-pkg-config", gnu_target));
-    h.insert("RANLIB", format!("{}-ranlib", gnu_target));
+    h.insert("RANLIB", format!("{}-gcc-ranlib", gnu_target));
     h.insert("READELF", format!("{}-readelf", gnu_target));
     h.insert("STRIP", format!("{}-strip", gnu_target));
     h
