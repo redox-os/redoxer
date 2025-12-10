@@ -13,7 +13,9 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
         paths.insert(0, toolchain_dir.join("bin"));
         let new_path =
             env::join_paths(paths).map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
-        env::set_var("PATH", new_path);
+        unsafe {
+            env::set_var("PATH", new_path);
+        }
     }
 
     // Use CARGO_ENCODED_RUSTFLAGS to handle spaces
@@ -75,12 +77,15 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
         }
     );
 
+    let cc_target_var = target().replace("-", "_");
+    let cargo_target_var = cc_target_var.to_uppercase();
+
     crate::env::command("cargo")?
         .arg(subcommand)
         .arg("--target")
         .arg(target())
         .args(arguments)
-        .env("CARGO_TARGET_X86_64_UNKNOWN_REDOX_RUNNER", runner)
+        .env(format!("CARGO_TARGET_{}_RUNNER", cargo_target_var), runner)
         .env("CARGO_ENCODED_RUSTFLAGS", rustflags)
         .status()
         .and_then(status_error)?;

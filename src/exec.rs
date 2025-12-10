@@ -8,10 +8,37 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io};
 
 use crate::redoxfs::{syscall_error, RedoxFs};
-use crate::{redoxer_dir, status_error};
+use crate::{host_target, redoxer_dir, status_error, target};
 
 const BOOTLOADER_SIZE: usize = 2 * 1024 * 1024;
 const DISK_SIZE: u64 = 3 * 1024 * 1024 * 1024;
+
+pub fn qemu_executable() -> &'static str {
+    match target() {
+        "x86_64-unknown-redox" => "qemu-system-x86_64",
+        "aarch64-unknown-redox" => "qemu-system-aarch64",
+        "i586-unknown-redox" | "i686-unknown-redox" => "qemu-system-i386",
+        "riscv64gc-unknown-redox" => "qemu-system-riscv64",
+        _ => panic!("Unknown target architecture for QEMU"),
+    }
+}
+
+pub fn qemu_has_kvm() -> bool {
+    fn get_arch(triple: &str) -> &str {
+        triple.split('-').next().unwrap_or(triple)
+    }
+    Path::new("/dev/kvm").exists() && get_arch(host_target()) == get_arch(target())
+}
+
+pub fn qemu_use_uefi() -> bool {
+    match target() {
+        "x86_64-unknown-redox" => false,
+        "aarch64-unknown-redox" => true,
+        "i586-unknown-redox" | "i686-unknown-redox" => false,
+        "riscv64gc-unknown-redox" => true,
+        _ => panic!("Unknown target architecture for QEMU"),
+    }
+}
 
 static BASE_TOML: &'static str = include_str!("../res/base.toml");
 static GUI_TOML: &'static str = include_str!("../res/gui.toml");
@@ -45,7 +72,12 @@ fn bootloader() -> io::Result<PathBuf> {
             .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
 
         fs::rename(
-            &bootloader_dir.join("boot/bootloader.bios"),
+            &bootloader_dir.join(if qemu_use_uefi() {
+                //TODO: Is this possible?
+                "boot/bootloader-live.efi"
+            } else {
+                "boot/bootloader.bios"
+            }),
             &bootloader_bin,
         )?;
     }
@@ -68,6 +100,9 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
         fs::create_dir_all(&base_dir)?;
 
         let base_partial = redoxer_dir().join(format!("{}.{}.partial", name, ext));
+        if base_partial.is_file() {
+            fs::remove_file(&base_partial)?;
+        }
 
         if fuse {
             let disk = DiskSparse::create(&base_partial, DISK_SIZE).map_err(syscall_error)?;
@@ -282,16 +317,16 @@ fn inner(
     gui: bool,
     output_opt: Option<String>,
 ) -> anyhow::Result<i32> {
-    let qemu_binary = config
-        .qemu_binary
-        .as_deref()
-        .unwrap_or("qemu-system-x86_64");
+    let qemu_binary = config.qemu_binary.as_deref().unwrap_or(qemu_executable());
 
     if !installed(qemu_binary)? {
-        eprintln!("redoxer: qemu-system-x86 not found, please install before continuing");
+        eprintln!(
+            "redoxer: {} not found, please install before continuing",
+            qemu_executable()
+        );
         process::exit(1);
     }
-    let kvm = Path::new("/dev/kvm").exists();
+    let kvm = qemu_has_kvm();
 
     let fuse = config
         .fuse
