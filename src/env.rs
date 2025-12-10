@@ -13,7 +13,9 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
         let mut paths = env::split_paths(&path).collect::<Vec<_>>();
         paths.insert(0, toolchain_dir.join("bin"));
         let new_path = env::join_paths(paths)?;
-        env::set_var("PATH", new_path);
+        unsafe {
+            env::set_var("PATH", new_path);
+        }
     }
 
     let target = target();
