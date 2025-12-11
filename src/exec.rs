@@ -176,7 +176,8 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
         }
 
         if fuse {
-            let disk = DiskSparse::create(&base_partial, qemu_disk_size()).map_err(syscall_error)?;
+            let disk =
+                DiskSparse::create(&base_partial, qemu_disk_size()).map_err(syscall_error)?;
 
             let bootloader = {
                 let mut bootloader = fs::read(bootloader_bin)?.to_vec();
@@ -499,7 +500,12 @@ fn inner(
         }
 
         if !fuse {
-            archive_free_space(&redoxer_bin, &redoxer_dir, &bootloader_bin, qemu_disk_size())?;
+            archive_free_space(
+                &redoxer_bin,
+                &redoxer_dir,
+                &bootloader_bin,
+                qemu_disk_size(),
+            )?;
         }
 
         let redoxer_log = tempdir.path().join("redoxer.log");
