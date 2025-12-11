@@ -21,12 +21,6 @@ prompt = false
 
 [packages.findutils]
 
-[packages.gcc13]
-
-[packages."gcc13.cxx"]
-
-[packages.gnu-binutils]
-
 [packages.ion]
 
 [packages.kernel]
@@ -40,8 +34,6 @@ prompt = false
 [packages.netutils]
 
 [packages.pkgutils]
-
-[packages.redoxerd]
 
 [packages.relibc]
 
