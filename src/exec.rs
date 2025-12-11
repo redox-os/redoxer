@@ -11,7 +11,10 @@ use crate::redoxfs::{syscall_error, RedoxFs};
 use crate::{host_target, redoxer_dir, status_error, target};
 
 const BOOTLOADER_SIZE: usize = 2 * 1024 * 1024;
+// extra disk space to fit large projects
 const DISK_SIZE: u64 = 3 * 1024 * 1024 * 1024;
+// need to fit under the default RAM
+const DISK_SIZE_LIVE: u64 = 1 * 1024 * 1024 * 1024;
 
 pub fn qemu_executable() -> &'static str {
     match target() {
@@ -27,25 +30,87 @@ pub fn qemu_has_kvm() -> bool {
     fn get_arch(triple: &str) -> &str {
         triple.split('-').next().unwrap_or(triple)
     }
-    Path::new("/dev/kvm").exists() && get_arch(host_target()) == get_arch(target())
+    Path::new("/dev/kvm").exists()
+        && get_arch(host_target()) == get_arch(target())
+        // https://gitlab.redox-os.org/redox-os/redox/-/issues/1714
+        && get_arch(host_target()) != "aarch64"
 }
 
 pub fn qemu_use_uefi() -> bool {
     match target() {
         "x86_64-unknown-redox" => false,
-        "aarch64-unknown-redox" => true,
         "i586-unknown-redox" | "i686-unknown-redox" => false,
+        "aarch64-unknown-redox" => true,
         "riscv64gc-unknown-redox" => true,
         _ => panic!("Unknown target architecture for QEMU"),
     }
 }
 
+pub fn qemu_use_live_disk() -> bool {
+    match target() {
+        "x86_64-unknown-redox" => false,
+        "i586-unknown-redox" | "i686-unknown-redox" => false,
+        "aarch64-unknown-redox" => true,
+        "riscv64gc-unknown-redox" => true,
+        _ => panic!("Unknown target architecture for QEMU"),
+    }
+}
+
+pub fn qemu_disk_size() -> u64 {
+    if qemu_use_live_disk() {
+        DISK_SIZE_LIVE
+    } else {
+        DISK_SIZE
+    }
+}
+
+pub fn qemu_default_args() -> Vec<&'static str> {
+    #[rustfmt::skip]
+    let mut default_args = vec![
+        "-cpu", "max",
+        "-m", "2048",
+        "-smp", "4",
+        "-netdev", "user,id=net0",
+        "-device", "e1000,netdev=net0",
+    ];
+    default_args.extend(match target() {
+        #[rustfmt::skip]
+        "i586-unknown-redox" | "x86_64-unknown-redox" => vec![
+            "-machine", "q35", 
+            "-serial", "mon:stdio",
+            "-device", "isa-debugcon,chardev=log",
+            "-device", "isa-debug-exit",
+        ],
+        "aarch64-unknown-redox" => {
+            let (bios_arg, bios_file) = if Path::new("/usr/share/AAVMF/AAVMF_CODE.fd").exists() {
+                ("-bios", "/usr/share/AAVMF/AAVMF_CODE.fd")
+            } else if Path::new("/usr/share/qemu/edk2-aarch64-code.fd").exists() {
+                ("-drive", "if=pflash,format=raw,unit=0,file=/usr/share/qemu/edk2-aarch64-code.fd,readonly=on")
+            } else {
+                todo!("Can't figure out where is the BIOS file!")
+            };
+            #[rustfmt::skip]
+            vec![
+                "-machine", "virt",
+                "-serial", "chardev:debug",
+                "-mon", "chardev=debug",
+                bios_arg, bios_file,
+                "-chardev", "stdio,id=debug,signal=off,mux=on",
+                "-semihosting-config", "enable=on,target=native,userspace=on"
+            ]
+        }
+        #[rustfmt::skip]
+        "riscv64gc-unknown-redox" => vec![
+            "-machine", "virt",
+            "-semihosting-config", "enable=on,target=native,userspace=on"
+        ],
+        _ => panic!("Unknown target architecture for QEMU"),
+    });
+    default_args
+}
+
 static BASE_TOML: &'static str = include_str!("../res/base.toml");
 static GUI_TOML: &'static str = include_str!("../res/gui.toml");
-
-/// Redoxer is used for testing out apps in redox OS environment.
-/// For this reason no live image is required
-const INSTALL_LIVE_IMAGE: bool = false;
 
 fn bootloader() -> io::Result<PathBuf> {
     let bootloader_bin = redoxer_dir().join("bootloader.bin");
@@ -68,8 +133,14 @@ fn bootloader() -> io::Result<PathBuf> {
             .packages
             .insert("bootloader".to_string(), Default::default());
         let cookbook: Option<&str> = None;
-        redox_installer::install(config, &bootloader_dir, cookbook, INSTALL_LIVE_IMAGE, None)
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
+        redox_installer::install(
+            config,
+            &bootloader_dir,
+            cookbook,
+            qemu_use_live_disk(),
+            None,
+        )
+        .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
 
         fs::rename(
             &bootloader_dir.join(if qemu_use_uefi() {
@@ -105,7 +176,7 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
         }
 
         if fuse {
-            let disk = DiskSparse::create(&base_partial, DISK_SIZE).map_err(syscall_error)?;
+            let disk = DiskSparse::create(&base_partial, qemu_disk_size()).map_err(syscall_error)?;
 
             let bootloader = {
                 let mut bootloader = fs::read(bootloader_bin)?.to_vec();
@@ -128,7 +199,7 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
             )
             .map_err(syscall_error)?;
 
-            fs.disk.file.set_len(DISK_SIZE)?;
+            fs.disk.file.set_len(qemu_disk_size())?;
         }
 
         {
@@ -156,7 +227,7 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
                         .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
 
                 let cookbook: Option<&str> = None;
-                redox_installer::install(config, &base_dir, cookbook, INSTALL_LIVE_IMAGE, None)
+                redox_installer::install(config, &base_dir, cookbook, qemu_use_live_disk(), None)
                     .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
             }
 
@@ -428,28 +499,17 @@ fn inner(
         }
 
         if !fuse {
-            archive_free_space(&redoxer_bin, &redoxer_dir, &bootloader_bin, DISK_SIZE)?;
+            archive_free_space(&redoxer_bin, &redoxer_dir, &bootloader_bin, qemu_disk_size())?;
         }
 
         let redoxer_log = tempdir.path().join("redoxer.log");
         let mut command = Command::new(qemu_binary);
 
         let chardev = format!("file,id=log,path={}", redoxer_log.display());
-        let drive = format!("file={},format=raw", redoxer_bin.display());
+        let drive = format!("file={},format=raw,if=virtio", redoxer_bin.display());
         #[rustfmt::skip]
-        let mut default_args = vec![
-            "-cpu", "max",
-            "-machine", "q35", 
-            "-m", "2048",
-            "-smp", "4",
-            "-serial", "mon:stdio",
-            "-chardev", &chardev,
-            "-netdev", "user,id=net0",
-            "-device", "isa-debugcon,chardev=log",
-            "-device", "isa-debug-exit",
-            "-device", "e1000,netdev=net0",
-            "-drive", &drive,
-        ];
+        let mut default_args = qemu_default_args();
+        default_args.extend(vec!["-chardev", &chardev, "-drive", &drive]);
         if kvm {
             default_args.push("-accel");
             default_args.push("kvm");
