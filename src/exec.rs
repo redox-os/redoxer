@@ -81,6 +81,7 @@ pub fn qemu_default_args() -> Vec<&'static str> {
             "-device", "isa-debugcon,chardev=log",
             "-device", "isa-debug-exit",
         ],
+        #[rustfmt::skip]
         "aarch64-unknown-redox" => {
             let (bios_arg, bios_file) = if Path::new("/usr/share/AAVMF/AAVMF_CODE.fd").exists() {
                 ("-bios", "/usr/share/AAVMF/AAVMF_CODE.fd")
@@ -89,7 +90,6 @@ pub fn qemu_default_args() -> Vec<&'static str> {
             } else {
                 todo!("Can't figure out where is the BIOS file!")
             };
-            #[rustfmt::skip]
             vec![
                 "-machine", "virt",
                 "-serial", "chardev:debug",
