@@ -92,6 +92,10 @@ pub fn host_target() -> &'static str {
         "linux-gnu"
     } else if cfg!(target_os = "redox") {
         "redox"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "freebsd") {
+        "freebsd"
     } else {
         ""
     };
@@ -105,8 +109,14 @@ pub fn host_target() -> &'static str {
     match (arch, os) {
         ("x86_64", "linux-gnu") => "x86_64-unknown-linux-gnu",
         ("aarch64", "linux-gnu") => "aarch64-unknown-linux-gnu",
+        // these are listed so just compilation targeting the host works
+        // it doesn't have the official cross compiler toolchain bundled
         ("x86_64", "redox") => "x86_64-unknown-redox",
         ("aarch64", "redox") => "aarch64-unknown-redox",
+        ("x86_64", "macos") => "x86_64-apple-darwin",
+        ("aarch64", "macos") => "x86_64-apple-darwin",
+        ("x86_64", "freebsd") => "x86_64-unknown-freebsd",
+        ("aarch64", "freebsd") => "aarch64-unknown-freebsd",
         _ => panic!("Unsupported host OS/ARCH!"),
     }
 }
