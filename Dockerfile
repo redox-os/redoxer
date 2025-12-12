@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 ubuntu:24.04
+FROM ubuntu:24.04
 
 # Install dependencies
 RUN export DEBIAN_FRONTEND=noninteractive && \
@@ -12,6 +12,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
       libfuse-dev \
       pkg-config \
       qemu-system-x86 \
+      qemu-system-arm \
       rsync \
       nasm \
     && rm -rf /var/lib/apt/lists/*
