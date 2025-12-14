@@ -11,7 +11,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
       fuse \
       libfuse-dev \
       pkg-config \
-      qemu-system-x86 \
+      qemu-system-arm \
       rsync \
       nasm \
     && rm -rf /var/lib/apt/lists/*
@@ -22,6 +22,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
 
 # Set path
 ENV PATH=/root/.cargo/bin:$PATH
+ENV TARGET=aarch64-unknown-redox
 
 # Install redoxer
 COPY . /root/redoxer
@@ -29,7 +30,7 @@ RUN cargo install --path /root/redoxer && \
     rm -rf /root/redoxer /root/.cargo/git /root/.cargo/registry 
 
 # Install redoxer toolchain
-RUN TARGET=x86_64-unknown-redox redoxer toolchain
+RUN redoxer toolchain
 
 # Ensure redoxer exec is working
 RUN redoxer exec true
