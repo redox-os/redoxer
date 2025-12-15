@@ -102,6 +102,7 @@ pub fn qemu_default_args() -> Vec<&'static str> {
         #[rustfmt::skip]
         "riscv64gc-unknown-redox" => vec![
             "-machine", "virt",
+            // TODO: Add more devices
             "-semihosting-config", "enable=on,target=native,userspace=on"
         ],
         _ => panic!("Unknown target architecture for QEMU"),
@@ -513,7 +514,6 @@ fn inner(
 
         let chardev = format!("file,id=log,path={}", redoxer_log.display());
         let drive = format!("file={},format=raw,if=virtio", redoxer_bin.display());
-        #[rustfmt::skip]
         let mut default_args = qemu_default_args();
         default_args.extend(vec!["-chardev", &chardev, "-drive", &drive]);
         if kvm {

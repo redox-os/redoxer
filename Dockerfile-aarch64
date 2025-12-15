@@ -9,9 +9,12 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
       curl \
       expect \
       fuse \
+      ipxe-qemu \
       libfuse-dev \
       pkg-config \
       qemu-system-arm \
+      qemu-efi-arm \
+      qemu-efi-aarch64 \
       rsync \
       nasm \
     && rm -rf /var/lib/apt/lists/*
