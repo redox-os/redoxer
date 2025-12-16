@@ -1,16 +1,13 @@
 use anyhow::Context;
-use redoxfs::{archive_at, DiskSparse, FileSystem, TreePtr, BLOCK_SIZE};
 use std::collections::HashSet;
 use std::env::VarError;
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::{fs, io};
 
-use crate::redoxfs::{syscall_error, RedoxFs};
+use crate::redoxfs::{archive_image, extract_tar, run_install_mount, run_install_to_dir, RedoxFs};
 use crate::{host_target, redoxer_dir, status_error, target};
 
-const BOOTLOADER_SIZE: usize = 2 * 1024 * 1024;
 // extra disk space to fit large projects
 const DISK_SIZE: u64 = 3 * 1024 * 1024 * 1024;
 // need to fit under the default RAM
@@ -75,7 +72,7 @@ pub fn qemu_default_args() -> Vec<&'static str> {
     ];
     default_args.extend(match target() {
         #[rustfmt::skip]
-        "i586-unknown-redox" | "x86_64-unknown-redox" => vec![
+        "i586-unknown-redox" | "i686-unknown-redox" | "x86_64-unknown-redox" => vec![
             "-machine", "q35", 
             "-serial", "mon:stdio",
             "-device", "isa-debugcon,chardev=log",
@@ -102,6 +99,7 @@ pub fn qemu_default_args() -> Vec<&'static str> {
         #[rustfmt::skip]
         "riscv64gc-unknown-redox" => vec![
             "-machine", "virt",
+            // TODO: Add more devices
             "-semihosting-config", "enable=on,target=native,userspace=on"
         ],
         _ => panic!("Unknown target architecture for QEMU"),
@@ -112,7 +110,7 @@ pub fn qemu_default_args() -> Vec<&'static str> {
 static BASE_TOML: &'static str = include_str!("../res/base.toml");
 static GUI_TOML: &'static str = include_str!("../res/gui.toml");
 
-fn bootloader() -> io::Result<PathBuf> {
+fn bootloader() -> anyhow::Result<PathBuf> {
     let bootloader_bin = redoxer_dir().join("bootloader.bin");
     if !bootloader_bin.is_file() {
         eprintln!("redoxer: building bootloader");
@@ -132,19 +130,11 @@ fn bootloader() -> io::Result<PathBuf> {
         config
             .packages
             .insert("bootloader".to_string(), Default::default());
-        let cookbook: Option<&str> = None;
-        redox_installer::install(
-            config,
-            &bootloader_dir,
-            cookbook,
-            qemu_use_live_disk(),
-            None,
-        )
-        .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
+        redox_installer::install(config, &bootloader_dir)
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
 
         fs::rename(
             &bootloader_dir.join(if qemu_use_uefi() {
-                //TODO: Is this possible?
                 "boot/bootloader-live.efi"
             } else {
                 "boot/bootloader.bios"
@@ -155,13 +145,13 @@ fn bootloader() -> io::Result<PathBuf> {
     Ok(bootloader_bin)
 }
 
-fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
+fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> anyhow::Result<PathBuf> {
     let name = if gui { "gui" } else { "base" };
     let ext = if fuse { "bin" } else { "tar" };
 
-    let base_bin = redoxer_dir().join(format!("{}.{}", name, ext));
+    let tar_file = redoxer_dir().join(format!("{}.{}", name, ext));
     let base_tar = redoxer_dir().join(format!("{}.{}", name, "tar"));
-    if !base_bin.is_file() {
+    if !tar_file.is_file() {
         eprintln!("redoxer: building {}", name);
 
         let base_dir = redoxer_dir().join(name);
@@ -175,69 +165,24 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
             fs::remove_file(&base_partial)?;
         }
 
+        let mut config: redox_installer::Config =
+            toml::from_str(if gui { GUI_TOML } else { BASE_TOML })
+                .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
+        config.general.live_disk = Some(qemu_use_live_disk());
+
         if fuse {
-            let disk =
-                DiskSparse::create(&base_partial, qemu_disk_size()).map_err(syscall_error)?;
+            run_install_mount(
+                config,
+                bootloader_bin,
+                qemu_use_uefi(),
+                qemu_disk_size(),
+                &base_tar,
+                &base_dir,
+                &base_partial,
+            )?;
+        } else {
+            run_install_to_dir(config, &base_dir)?;
 
-            let bootloader = {
-                let mut bootloader = fs::read(bootloader_bin)?.to_vec();
-
-                // Pad bootloader to 2 MiB
-                while bootloader.len() < BOOTLOADER_SIZE {
-                    bootloader.push(0);
-                }
-
-                bootloader
-            };
-
-            let ctime = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-            let fs = FileSystem::create_reserved(
-                disk,
-                None,
-                &bootloader,
-                ctime.as_secs(),
-                ctime.subsec_nanos(),
-            )
-            .map_err(syscall_error)?;
-
-            fs.disk.file.set_len(qemu_disk_size())?;
-        }
-
-        {
-            let redoxfs_opt = if fuse {
-                Some(RedoxFs::new(&base_partial, &base_dir)?)
-            } else {
-                None
-            };
-
-            if fuse && base_tar.exists() {
-                // redoxer in docker was built without kvm, then CI has kvm
-                eprintln!("redoxer: extracting {}", name);
-                Command::new("tar")
-                    .arg("-x")
-                    .arg("-p")
-                    .arg("-f")
-                    .arg(&base_tar)
-                    .arg("-C")
-                    .arg(&base_dir)
-                    .status()
-                    .and_then(status_error)?;
-            } else {
-                let config: redox_installer::Config =
-                    toml::from_str(if gui { GUI_TOML } else { BASE_TOML })
-                        .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
-
-                let cookbook: Option<&str> = None;
-                redox_installer::install(config, &base_dir, cookbook, qemu_use_live_disk(), None)
-                    .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
-            }
-
-            if let Some(mut redoxfs) = redoxfs_opt {
-                redoxfs.unmount()?;
-            }
-        }
-
-        if !fuse {
             eprintln!("redoxer: compressing {}", name);
             Command::new("tar")
                 .arg("-c")
@@ -251,83 +196,10 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> io::Result<PathBuf> {
                 .and_then(status_error)?;
         }
 
-        fs::rename(&base_partial, &base_bin)?;
-        fs::remove_dir_all(&base_dir)?;
+        fs::rename(&base_partial, &tar_file)?;
+        // fs::remove_dir_all(&base_dir)?;
     }
-    Ok(base_bin)
-}
-
-fn archive_free_space(
-    disk_path: &Path,
-    folder_path: &Path,
-    bootloader_path: &Path,
-    free_space: u64,
-) -> io::Result<()> {
-    let disk = DiskSparse::create(&disk_path, free_space).map_err(syscall_error)?;
-
-    let bootloader = {
-        let mut bootloader = fs::read(bootloader_path)?.to_vec();
-
-        // Pad bootloader to 2 MiB
-        while bootloader.len() < BOOTLOADER_SIZE {
-            bootloader.push(0);
-        }
-
-        bootloader
-    };
-
-    let ctime = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-    let mut fs = FileSystem::create_reserved(
-        disk,
-        None,
-        &bootloader,
-        ctime.as_secs(),
-        ctime.subsec_nanos(),
-    )
-    .map_err(syscall_error)?;
-
-    let end_block = fs
-        .tx(|tx| {
-            // Archive_at root node
-            archive_at(tx, folder_path, TreePtr::root())
-                .map_err(|err| syscall::Error::new(err.raw_os_error().unwrap()))?;
-
-            // Squash alloc log
-            tx.sync(true)?;
-
-            let end_block = tx.header.size() / BLOCK_SIZE;
-            /* TODO: Cut off any free blocks at the end of the filesystem
-            let mut end_changed = true;
-            while end_changed {
-                end_changed = false;
-
-                let allocator = fs.allocator();
-                let levels = allocator.levels();
-                for level in 0..levels.len() {
-                    let level_size = 1 << level;
-                    for &block in levels[level].iter() {
-                        if block < end_block && block + level_size >= end_block {
-                            end_block = block;
-                            end_changed = true;
-                        }
-                    }
-                }
-            }
-            */
-
-            // Update header
-            tx.header.size = (end_block * BLOCK_SIZE).into();
-            tx.header_changed = true;
-            tx.sync(false)?;
-
-            Ok(end_block)
-        })
-        .map_err(syscall_error)?;
-
-    let size = (fs.block + end_block) * BLOCK_SIZE;
-    fs.disk.file.set_len(size)?;
-
-    Ok(())
+    Ok(tar_file)
 }
 
 struct RedoxerConfig {
@@ -415,7 +287,7 @@ fn inner(
     }
 
     let bootloader_bin = bootloader().context("unable to init bootloader")?;
-    let base_bin = base(&bootloader_bin, gui, fuse).context("unable to init base")?;
+    let tar_file = base(&bootloader_bin, gui, fuse).context("unable to init base")?;
 
     let tempdir = tempfile::tempdir().context("unable to create tempdir")?;
 
@@ -423,32 +295,21 @@ fn inner(
         let redoxer_bin = tempdir.path().join("redoxer.bin");
         if fuse {
             Command::new("cp")
-                .arg(&base_bin)
+                .arg(&tar_file)
                 .arg(&redoxer_bin)
                 .status()
                 .and_then(status_error)
                 .context("copy base to redoxer bin failed")?;
         }
 
-        let redoxer_dir = tempdir.path().join("redoxer");
-        fs::create_dir_all(&redoxer_dir).context("unable to create redoxer dir")?;
+        let dest_dir = tempdir.path().join("redoxer");
+        fs::create_dir_all(&dest_dir).context("unable to create redoxer dir")?;
 
         {
             let redoxfs_opt = if fuse {
-                Some(RedoxFs::new(&redoxer_bin, &redoxer_dir).context("unable to init redoxfs")?)
+                Some(RedoxFs::new(&redoxer_bin, &dest_dir).context("unable to init redoxfs")?)
             } else {
-                Command::new("tar")
-                    .arg("-x")
-                    .arg("-p")
-                    .arg("--same-owner")
-                    .arg("-f")
-                    .arg(&base_bin)
-                    .arg("-C")
-                    .arg(&redoxer_dir)
-                    .arg(".")
-                    .status()
-                    .and_then(status_error)
-                    .context("tar failed")?;
+                extract_tar(&tar_file, &dest_dir)?;
                 None
             };
 
@@ -478,13 +339,13 @@ fn inner(
                 redoxerd_config.push_str(&arg);
                 redoxerd_config.push('\n');
             }
-            fs::write(redoxer_dir.join("etc/redoxerd"), redoxerd_config)
+            fs::write(dest_dir.join("etc/redoxerd"), redoxerd_config)
                 .context("unable to write redoxerd config")?;
 
             if let Some(ref folder) = folder_opt {
                 eprintln!("redoxer: copying '{}' to '/root'", folder);
 
-                let root_dir = redoxer_dir.join("root");
+                let root_dir = dest_dir.join("root");
                 Command::new("rsync")
                     .arg("--archive")
                     .arg(&folder)
@@ -500,10 +361,11 @@ fn inner(
         }
 
         if !fuse {
-            archive_free_space(
+            archive_image(
                 &redoxer_bin,
-                &redoxer_dir,
+                &dest_dir,
                 &bootloader_bin,
+                qemu_use_uefi(),
                 qemu_disk_size(),
             )?;
         }
@@ -513,7 +375,6 @@ fn inner(
 
         let chardev = format!("file,id=log,path={}", redoxer_log.display());
         let drive = format!("file={},format=raw,if=virtio", redoxer_bin.display());
-        #[rustfmt::skip]
         let mut default_args = qemu_default_args();
         default_args.extend(vec!["-chardev", &chardev, "-drive", &drive]);
         if kvm {
