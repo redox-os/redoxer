@@ -288,12 +288,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46c5e41b57b8bba42a04676d81cb89e9ee8e859a1a66f80a5a72e1cb76b34d43"
 
 [[package]]
-name = "bytecount"
-version = "0.6.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "175812e0be2bccb6abe50bb8d566126198344f707e304f45c648fd8f2cc0365e"
-
-[[package]]
 name = "bytemuck"
 version = "1.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1227,15 +1221,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
 
 [[package]]
-name = "itertools"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
-dependencies = [
- "either",
-]
-
-[[package]]
 name = "itoa"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1588,7 +1573,7 @@ dependencies = [
  "bytes",
  "getrandom 0.3.4",
  "lru-slab",
- "rand 0.9.2",
+ "rand",
  "ring",
  "rustc-hash",
  "rustls",
@@ -1631,33 +1616,12 @@ checksum = "69cdb34c158ceb288df11e18b4bd39de994f6657d83847bdffdbd7f346754b0f"
 
 [[package]]
 name = "rand"
-version = "0.8.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
-dependencies = [
- "libc",
- "rand_chacha 0.3.1",
- "rand_core 0.6.4",
-]
-
-[[package]]
-name = "rand"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6db2770f06117d490610c7488547d543617b21bfa07796d7a12f6f1bd53850d1"
 dependencies = [
- "rand_chacha 0.9.0",
+ "rand_chacha",
  "rand_core 0.9.3",
-]
-
-[[package]]
-name = "rand_chacha"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
-dependencies = [
- "ppv-lite86",
- "rand_core 0.6.4",
 ]
 
 [[package]]
@@ -1722,9 +1686,9 @@ checksum = "436d45c2b6a5b159d43da708e62b25be3a4a3d5550d654b72216ade4c4bfd717"
 
 [[package]]
 name = "redox-pkg"
-version = "0.2.8"
+version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d50a7ed267e236ce8bfa178bfd3fb7a39765689d037e51c57f36bad46f474fd"
+checksum = "0a18d9b020d0fd3fa4e613bc7ffc3c789fba16f4e74c484cc7e63f6ffb71bc09"
 dependencies = [
  "anyhow",
  "ignore",
@@ -1751,13 +1715,11 @@ dependencies = [
 
 [[package]]
 name = "redox_installer"
-version = "0.2.37"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86b0e2e9b588faacd83ff68ce0f4dcd7a47e7477ff3405c63c79712bcd550931"
+version = "0.2.38"
+source = "git+https://gitlab.redox-os.org/redox-os/installer#7e697cfb3a364d861670b50584b65fe4bb2c8d36"
 dependencies = [
  "anyhow",
  "arg_parser",
- "cc",
  "fatfs",
  "fscommon",
  "gpt",
@@ -1766,9 +1728,8 @@ dependencies = [
  "pkgar",
  "pkgar-core",
  "pkgar-keys",
- "rand 0.8.5",
+ "rand",
  "redox-pkg",
- "redox_liner",
  "redox_syscall",
  "redoxfs",
  "rust-argon2",
@@ -1777,19 +1738,6 @@ dependencies = [
  "termion",
  "toml 0.8.23",
  "uuid",
-]
-
-[[package]]
-name = "redox_liner"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee4596948a78a2ac29268d4ee45f788789ac8c032c77cf255378e5c96ca0c779"
-dependencies = [
- "bytecount",
- "itertools",
- "strip-ansi-escapes",
- "termion",
- "unicode-width 0.1.14",
 ]
 
 [[package]]
@@ -2204,15 +2152,6 @@ name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
-
-[[package]]
-name = "strip-ansi-escapes"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a8f8038e7e7969abb3f1b7c2a811225e9296da208539e0f79c5251d6cac0025"
-dependencies = [
- "vte",
-]
 
 [[package]]
 name = "strsim"
@@ -2638,15 +2577,6 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package]]
-name = "vte"
-version = "0.14.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "231fdcd7ef3037e8330d8e17e61011a2c244126acc0a982f4040ac3f9f0bc077"
-dependencies = [
- "memchr",
-]
 
 [[package]]
 name = "walkdir"
