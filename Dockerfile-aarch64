@@ -29,11 +29,13 @@ ENV TARGET=aarch64-unknown-redox
 
 # Install redoxer
 COPY . /root/redoxer
-RUN cargo install --path /root/redoxer && \
-    rm -rf /root/redoxer /root/.cargo/git /root/.cargo/registry 
+RUN cargo install --path /root/redoxer
 
 # Install redoxer toolchain
 RUN redoxer toolchain
 
 # Ensure redoxer exec is working
-RUN redoxer exec true
+# TODO: uutils doesn't work yet
+RUN cd /root/redoxer/example && redoxer test
+
+RUN rm -rf /root/redoxer /root/.cargo/git /root/.cargo/registry 
