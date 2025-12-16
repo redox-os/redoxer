@@ -1716,7 +1716,8 @@ dependencies = [
 [[package]]
 name = "redox_installer"
 version = "0.2.38"
-source = "git+https://gitlab.redox-os.org/redox-os/installer#7e697cfb3a364d861670b50584b65fe4bb2c8d36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4bc739f0c00b87d2e44901881476d5289dcffd18e6c8819a264064d315e940c4"
 dependencies = [
  "anyhow",
  "arg_parser",
