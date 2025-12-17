@@ -11,6 +11,7 @@ mod pkg;
 #[cfg(feature = "cli-exec")]
 mod redoxfs;
 mod toolchain;
+mod writer;
 
 const SUPPORTED_TARGETS: &'static [&'static str] = &[
     "x86_64-unknown-redox",
@@ -51,6 +52,7 @@ fn usage() {
     eprintln!("redoxer run - cargo run with Redox target in Redox VM");
     eprintln!("redoxer rustc - cargo rustc with Redox target");
     eprintln!("redoxer test - cargo test with Redox target in Redox VM");
+    eprintln!("redoxer write-exec - write redoxer exec test configuration");
     eprintln!("redoxer toolchain - install toolchain");
     process::exit(1);
 }
@@ -134,6 +136,7 @@ pub fn main(args: &[String]) {
             #[cfg(not(feature = "cli-pkg"))]
             "pkg" => panic!("feature 'cli-pkg' is not compiled"),
             "toolchain" => toolchain::main(args),
+            "write-exec" => writer::main(args),
             _ => usage(),
         },
         None => usage(),

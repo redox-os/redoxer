@@ -6,6 +6,7 @@ use std::process::{self, Command};
 use std::{fs, io};
 
 use crate::redoxfs::{archive_image, extract_tar, run_install_mount, run_install_to_dir, RedoxFs};
+use crate::writer::write_redoxerd_config;
 use crate::{host_target, redoxer_dir, status_error, target};
 
 // extra disk space to fit large projects
@@ -114,8 +115,6 @@ pub fn qemu_default_args() -> Vec<&'static str> {
 
 static BASE_TOML: &'static str = include_str!("../res/base.toml");
 static GUI_TOML: &'static str = include_str!("../res/gui.toml");
-static INIT_ENV: &'static str = include_str!("../res/20_env");
-static INIT_REDOXER: &'static str = include_str!("../res/30_redoxer");
 
 fn bootloader() -> anyhow::Result<PathBuf> {
     let bootloader_bin = redoxer_dir().join("bootloader.bin");
@@ -328,33 +327,11 @@ fn inner(config: &RedoxerConfig) -> anyhow::Result<i32> {
                 None
             };
 
-            let mut redoxerd_config = String::new();
-            for arg in config.arguments.iter() {
-                // Replace absolute path to folder with /root in command name
-                // TODO: make this activated by a flag
-                if let Some(ref folder) = config.folders.get("root") {
-                    let folder_canonical_path =
-                        fs::canonicalize(&folder).context("unable to canonalize")?;
-                    let folder_canonical = folder_canonical_path.to_str().ok_or(io::Error::new(
-                        io::ErrorKind::Other,
-                        "folder path is not valid UTF-8",
-                    ))?;
-                    if arg.starts_with(&folder_canonical) {
-                        let arg_replace = arg.replace(folder_canonical, "/root");
-                        eprintln!(
-                            "redoxer: replacing '{}' with '{}' in arguments",
-                            arg, arg_replace
-                        );
-                        redoxerd_config.push_str(&arg_replace);
-                        redoxerd_config.push('\n');
-                        continue;
-                    }
-                }
-
-                redoxerd_config.push_str(&arg);
-                redoxerd_config.push('\n');
-            }
-            write_redoxerd_config(&dest_dir, &redoxerd_config)?;
+            write_redoxerd_config(
+                &dest_dir,
+                &config.arguments,
+                config.folders.get("root").map(|s| s.as_str()),
+            )?;
 
             for (sysroot, folder) in config.folders.iter() {
                 eprintln!("redoxer: copying '{folder}' to '/{sysroot}'",);
@@ -438,24 +415,6 @@ fn inner(config: &RedoxerConfig) -> anyhow::Result<i32> {
     tempdir.close()?;
 
     Ok(code)
-}
-
-// TODO: make this a public API without importing whole exec feature?
-fn write_redoxerd_config(dest_dir: &PathBuf, redoxerd_config: &str) -> Result<(), io::Error> {
-    fs::write(dest_dir.join("etc/redoxerd"), redoxerd_config)?;
-    let init_dir = dest_dir.join("usr/lib/init.d");
-    if !init_dir.is_dir() {
-        fs::create_dir_all(&init_dir)?;
-    }
-    let init_env_path = init_dir.join("20_env");
-    if !init_env_path.is_file() {
-        fs::write(&init_env_path, INIT_ENV)?;
-    }
-    let init_redoxer_path = init_dir.join("30_redoxer");
-    if !init_redoxer_path.is_file() {
-        fs::write(&init_redoxer_path, INIT_REDOXER)?;
-    }
-    Ok(())
 }
 
 fn usage(hint: &str) -> ! {
