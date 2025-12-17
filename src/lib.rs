@@ -1,5 +1,3 @@
-#[cfg(not(feature = "cli-exec"))]
-use core::panic;
 use std::{io, path, process};
 
 pub(crate) use self::toolchain::toolchain;
