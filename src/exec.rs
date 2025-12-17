@@ -27,10 +27,15 @@ pub fn qemu_has_kvm() -> bool {
     fn get_arch(triple: &str) -> &str {
         triple.split('-').next().unwrap_or(triple)
     }
+    let host = get_arch(host_target());
+    let target = get_arch(target());
     Path::new("/dev/kvm").exists()
-        && get_arch(host_target()) == get_arch(target())
-        // https://gitlab.redox-os.org/redox-os/redox/-/issues/1714
-        && get_arch(host_target()) != "aarch64"
+        && match (host, target) {
+            ("x86_64", "x86_64" | "i586" | "i686") => true,
+            // https://gitlab.redox-os.org/redox-os/redox/-/issues/1714
+            ("aarch64", "aarch64") => false,
+            (_, _) => false,
+        }
 }
 
 pub fn qemu_use_uefi() -> bool {
