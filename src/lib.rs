@@ -114,7 +114,7 @@ pub fn host_target() -> &'static str {
         ("x86_64", "redox") => "x86_64-unknown-redox",
         ("aarch64", "redox") => "aarch64-unknown-redox",
         ("x86_64", "macos") => "x86_64-apple-darwin",
-        ("aarch64", "macos") => "x86_64-apple-darwin",
+        ("aarch64", "macos") => "aarch64-apple-darwin",
         ("x86_64", "freebsd") => "x86_64-unknown-freebsd",
         ("aarch64", "freebsd") => "aarch64-unknown-freebsd",
         _ => panic!("Unsupported host OS/ARCH!"),
