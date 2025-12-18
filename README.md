@@ -20,11 +20,11 @@ redoxer <bench | build | check | doc | fetch | install | run | rustc | test> [-g
 redoxer <ar | cc | cxx> [arguments]
     Run as GNU compiler passed by `redoxer env $GNU_TARGET-*`
 
-redoxer exec [-f|--folder folder] [-g|--gui] [-h|--help] [-o|--output file] [--] <command> [arguments]...
-    Run a command inside QEMU, using a redox image
-    The redox image will be initialized if not exist
-    Specify a folder to copy it into /root inside redox image
-    If folder is not specified but <command> is a file, the file will be copied
+redoxer exec [-f|--folder folder] [-f|--folder folder:/path/in/redox] [-g|--gui] [-h|--help] [-i|--install-config] [-o|--output file] [--] <command> [arguments]...
+    Run a command inside QEMU, using a "base" or "gui" redox image, or provide custom one with --install-config
+    The redox image will be initialized if not exist or different with the specified --install-config
+    Specify a folder to copy it into /root inside redox image, or more generic one with folder:path
+    If folder for /root is not specified but <command> is a file, the file will be copied
     Environment flags:
         REDOXER_QEMU_BINARY   Override qemu binary
         REDOXER_QEMU_ARGS     Override qemu args

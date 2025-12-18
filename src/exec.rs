@@ -1,11 +1,12 @@
 use anyhow::Context;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env::VarError;
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::{fs, io};
 
 use crate::redoxfs::{archive_image, extract_tar, run_install_mount, run_install_to_dir, RedoxFs};
+use crate::writer::write_redoxerd_config;
 use crate::{host_target, redoxer_dir, status_error, target};
 
 // extra disk space to fit large projects
@@ -150,13 +151,32 @@ fn bootloader() -> anyhow::Result<PathBuf> {
     Ok(bootloader_bin)
 }
 
-fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> anyhow::Result<PathBuf> {
-    let name = if gui { "gui" } else { "base" };
+/// creating a base image, returns the base image, bool if orbital exists
+fn base(
+    bootloader_bin: &Path,
+    name: &str,
+    config_str: &str,
+    fuse: bool,
+) -> anyhow::Result<(PathBuf, bool)> {
     let ext = if fuse { "bin" } else { "tar" };
 
-    let tar_file = redoxer_dir().join(format!("{}.{}", name, ext));
+    let base_file = redoxer_dir().join(format!("{}.{}", name, ext));
     let base_tar = redoxer_dir().join(format!("{}.{}", name, "tar"));
-    if !tar_file.is_file() {
+    let base_toml = redoxer_dir().join(format!("{}.{}", name, "toml"));
+
+    let mut config: redox_installer::Config =
+        toml::from_str(config_str).context("Unable to parse install-config")?;
+    let has_orbital = config.packages.contains_key("orbital");
+
+    if base_toml.is_file() && base_file.is_file() {
+        let r = fs::read_to_string(&base_toml).context("Unable to read base toml")?;
+        if &r != config_str {
+            eprintln!("redoxer: clearing old {}", name);
+            fs::remove_file(&base_toml).context("Unable to delete base toml")?;
+            fs::remove_file(&base_file).context("Unable to delete base bin/tar")?;
+        }
+    }
+    if !base_file.is_file() {
         eprintln!("redoxer: building {}", name);
 
         let base_dir = redoxer_dir().join(name);
@@ -170,9 +190,6 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> anyhow::Result<PathBuf>
             fs::remove_file(&base_partial)?;
         }
 
-        let mut config: redox_installer::Config =
-            toml::from_str(if gui { GUI_TOML } else { BASE_TOML })
-                .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
         config.general.live_disk = Some(qemu_use_live_disk());
 
         if fuse {
@@ -201,17 +218,11 @@ fn base(bootloader_bin: &Path, gui: bool, fuse: bool) -> anyhow::Result<PathBuf>
                 .and_then(status_error)?;
         }
 
-        fs::rename(&base_partial, &tar_file)?;
-        // fs::remove_dir_all(&base_dir)?;
+        fs::rename(&base_partial, &base_file)?;
+        fs::remove_dir_all(&base_dir)?;
+        fs::write(base_toml, config_str)?;
     }
-    Ok(tar_file)
-}
-
-struct RedoxerConfig {
-    qemu_binary: Option<String>,
-    qemu_args: Option<String>,
-    fuse: Option<bool>,
-    // TODO: gui: bool, or generalize it into any config TOML
+    Ok((base_file, has_orbital))
 }
 
 fn apply_qemu_args(cmd: &mut Command, default: Vec<&str>, args_opt: Option<Vec<&str>>) {
@@ -259,27 +270,19 @@ fn installed(program: &str) -> io::Result<bool> {
         .map(|x| x.success())
 }
 
-fn inner(
-    arguments: &[String],
-    config: &RedoxerConfig,
-    folder_opt: Option<String>,
-    gui: bool,
-    output_opt: Option<String>,
-) -> anyhow::Result<i32> {
+fn inner(config: &RedoxerConfig) -> anyhow::Result<i32> {
     let qemu_binary = config.qemu_binary.as_deref().unwrap_or(qemu_executable());
 
     if !installed(qemu_binary)? {
         eprintln!(
             "redoxer: {} not found, please install before continuing",
-            qemu_executable()
+            qemu_binary
         );
         process::exit(1);
     }
     let kvm = qemu_has_kvm();
 
-    let fuse = config
-        .fuse
-        .unwrap_or_else(|| Path::new("/dev/fuse").exists());
+    let fuse = config.fuse;
 
     if fuse {
         if !installed("fusermount")? {
@@ -292,7 +295,13 @@ fn inner(
     }
 
     let bootloader_bin = bootloader().context("unable to init bootloader")?;
-    let tar_file = base(&bootloader_bin, gui, fuse).context("unable to init base")?;
+    let (base_file, gui) = base(
+        &bootloader_bin,
+        &config.config_name,
+        &config.config_toml,
+        fuse,
+    )
+    .context("unable to init base")?;
 
     let tempdir = tempfile::tempdir().context("unable to create tempdir")?;
 
@@ -300,7 +309,7 @@ fn inner(
         let redoxer_bin = tempdir.path().join("redoxer.bin");
         if fuse {
             Command::new("cp")
-                .arg(&tar_file)
+                .arg(&base_file)
                 .arg(&redoxer_bin)
                 .status()
                 .and_then(status_error)
@@ -314,47 +323,24 @@ fn inner(
             let redoxfs_opt = if fuse {
                 Some(RedoxFs::new(&redoxer_bin, &dest_dir).context("unable to init redoxfs")?)
             } else {
-                extract_tar(&tar_file, &dest_dir)?;
+                extract_tar(&base_file, &dest_dir)?;
                 None
             };
 
-            let mut redoxerd_config = String::new();
-            for arg in arguments.iter() {
-                // Replace absolute path to folder with /root in command name
-                // TODO: make this activated by a flag
-                if let Some(ref folder) = folder_opt {
-                    let folder_canonical_path =
-                        fs::canonicalize(&folder).context("unable to canonalize")?;
-                    let folder_canonical = folder_canonical_path.to_str().ok_or(io::Error::new(
-                        io::ErrorKind::Other,
-                        "folder path is not valid UTF-8",
-                    ))?;
-                    if arg.starts_with(&folder_canonical) {
-                        let arg_replace = arg.replace(folder_canonical, "/root");
-                        eprintln!(
-                            "redoxer: replacing '{}' with '{}' in arguments",
-                            arg, arg_replace
-                        );
-                        redoxerd_config.push_str(&arg_replace);
-                        redoxerd_config.push('\n');
-                        continue;
-                    }
-                }
+            write_redoxerd_config(
+                &dest_dir,
+                &config.arguments,
+                config.folders.get("root").map(|s| s.as_str()),
+            )?;
 
-                redoxerd_config.push_str(&arg);
-                redoxerd_config.push('\n');
-            }
-            fs::write(dest_dir.join("etc/redoxerd"), redoxerd_config)
-                .context("unable to write redoxerd config")?;
+            for (sysroot, folder) in config.folders.iter() {
+                eprintln!("redoxer: copying '{folder}' to '/{sysroot}'",);
 
-            if let Some(ref folder) = folder_opt {
-                eprintln!("redoxer: copying '{}' to '/root'", folder);
-
-                let root_dir = dest_dir.join("root");
+                let dst_dir = dest_dir.join(sysroot);
                 Command::new("rsync")
                     .arg("--archive")
                     .arg(&folder)
-                    .arg(&root_dir)
+                    .arg(&dst_dir)
                     .status()
                     .and_then(status_error)
                     .context("rsync failed")?;
@@ -417,7 +403,7 @@ fn inner(
             }
         };
 
-        if let Some(output) = output_opt {
+        if let Some(output) = &config.output {
             fs::copy(&redoxer_log, output)?;
         } else {
             print!("{}", fs::read_to_string(&redoxer_log)?);
@@ -431,82 +417,146 @@ fn inner(
     Ok(code)
 }
 
-fn usage() {
-    eprintln!("redoxer exec [-f|--folder folder] [-g|--gui] [-h|--help] [-o|--output file] [--] <command> [arguments]...");
+fn usage(hint: &str) -> ! {
+    if !hint.is_empty() {
+        eprintln!("error: {}", hint);
+    }
+    eprintln!("redoxer exec [-f|--folder folder] [-f|--folder folder:/path/in/redox] [-g|--gui] [-h|--help] [-i|--install-config] [-o|--output file] [--] <command> [arguments]...");
     process::exit(1);
 }
 
-pub fn main(args: &[String]) {
-    // Matching flags
-    let mut matching = true;
-    // Folder to copy
-    let mut folder_opt = None;
-    // Run with GUI
-    let mut gui = false;
-    // File to put command output into
-    let mut output_opt = None;
-    // Arguments to pass to command
-    let mut arguments = Vec::new();
+#[derive(Clone, Default)]
+struct RedoxerConfig {
+    // Qemu config
+    qemu_binary: Option<String>,
+    qemu_args: Option<String>,
+    fuse: bool,
+    // Installer config
+    config_name: String,
+    config_toml: String,
+    // Folders to copy
+    folders: HashMap<String, String>,
+    // Output log
+    output: Option<String>,
+    // Commands to execute
+    arguments: Vec<String>,
+}
 
-    let mut args = args.iter().cloned().skip(2);
-    while let Some(arg) = args.next() {
-        match (arg.as_str(), matching) {
-            ("-f" | "--folder", true) => match args.next() {
-                Some(folder) => folder_opt = Some(folder),
-                None => usage(),
-            },
-            ("-g" | "--gui", true) => gui = true,
-            // TODO: argument for replacing the folder path with /root when found in arguments
-            ("-h" | "--help", true) => usage(),
-            ("-o" | "--output", true) => match args.next() {
-                Some(output) => output_opt = Some(output),
-                None => usage(),
-            },
-            // TODO: "-p" | "--package"
-            ("--", true) => matching = false,
-            _ => {
-                matching = false;
-                arguments.push(arg);
+impl RedoxerConfig {
+    pub fn new(mut args: impl Iterator<Item = String>) -> Self {
+        use std::env::var;
+        fn parse_bool_env(name: &str) -> Option<bool> {
+            match var(name).as_deref() {
+                Ok("true" | "1") => Some(true),
+                Ok("false" | "0") => Some(false),
+                Ok(arg) => panic!("invalid argument {} for {}", arg, name),
+                Err(VarError::NotPresent) => None,
+                Err(VarError::NotUnicode(_)) => panic!("non-utf8 argument for {}", name),
             }
         }
-    }
+        let mut config = RedoxerConfig {
+            qemu_binary: var("REDOXER_QEMU_BINARY").ok(),
+            qemu_args: var("REDOXER_QEMU_ARGS").ok(),
+            fuse: parse_bool_env("REDOXER_USE_FUSE")
+                .unwrap_or_else(|| Path::new("/dev/fuse").exists()),
+            config_name: "base".into(),
+            config_toml: BASE_TOML.into(),
+            // other options should be passed from args
+            ..Default::default()
+        };
 
-    if arguments.is_empty() {
-        usage();
-    }
-
-    if folder_opt.is_none() {
-        if let Some(cmd) = arguments.get(0) {
-            if Path::new(cmd).is_file() {
-                if !cmd.contains('/') {
-                    eprintln!(
-                        "WARN: Skipping copy, you might mean to run exec with ./{}",
-                        cmd
-                    )
-                } else {
-                    folder_opt = Some(cmd.to_string());
+        // Matching flags
+        let mut matching = true;
+        while let Some(arg) = args.next() {
+            match (arg.as_str(), matching) {
+                ("-f" | "--folder", true) => match args.next() {
+                    Some(folder) => {
+                        let (dir, sysroot): (String, String) = match folder
+                            .chars()
+                            .filter(|c| *c == ':')
+                            .count()
+                        {
+                            0 => (folder, "/root".to_string()),
+                            1 => {
+                                let mut split = folder.split(":");
+                                let r = (
+                                    split.next().unwrap().to_string(),
+                                    split.next().unwrap().to_string(),
+                                );
+                                if !r.1.starts_with("/") {
+                                    usage("path on --folder with format 'directory:path' must be an absolute path (starting with '/')");
+                                }
+                                r
+                            }
+                            _ => usage("--folder can be 'directory' or 'directory:path'"),
+                        };
+                        if config
+                            .folders
+                            .insert(sysroot[1..].to_string(), dir)
+                            .is_some()
+                        {
+                            usage("path on --folder with format 'directory:path' must be unique");
+                        }
+                    }
+                    None => usage("--folder requires a path to a directory"),
+                },
+                ("-g" | "--gui", true) => {
+                    config.config_name = "gui".into();
+                    config.config_toml = GUI_TOML.into();
+                }
+                ("-i" | "--install-config", true) => match args.next() {
+                    Some(file) => {
+                        let path = Path::new(&file);
+                        config.config_name =
+                            path.file_stem().unwrap().to_string_lossy().to_string();
+                        if &config.config_name == "base" || &config.config_name == "gui" {
+                            usage("--install-config file path cannot be 'base' or 'gui'");
+                        }
+                        config.config_toml =
+                            fs::read_to_string(path).expect("unable to read --install-config file");
+                    }
+                    None => usage("--output requires a path to a directory"),
+                },
+                ("-h" | "--help", true) => usage(""),
+                ("-o" | "--output", true) => match args.next() {
+                    Some(output) => config.output = Some(output),
+                    None => usage("--output requires a path to a directory"),
+                },
+                ("--", true) => matching = false,
+                _ => {
+                    matching = false;
+                    config.arguments.push(arg);
                 }
             }
         }
-    }
 
-    use std::env::var;
-    fn parse_bool_env(name: &str) -> Option<bool> {
-        match var(name).as_deref() {
-            Ok("true" | "1") => Some(true),
-            Ok("false" | "0") => Some(false),
-            Ok(arg) => panic!("invalid argument {} for REDOXER_USE_FUSE", arg),
-            Err(VarError::NotPresent) => None,
-            Err(VarError::NotUnicode(_)) => panic!("non-utf8 argument for {}", name),
+        if !config.folders.contains_key("root") {
+            if let Some(cmd) = config.arguments.get(0) {
+                if Path::new(cmd).is_file() {
+                    if !cmd.contains('/') {
+                        eprintln!(
+                            "WARN: Skipping copy, you might mean to run exec with ./{}",
+                            cmd
+                        )
+                    } else {
+                        config.folders.insert("root".to_string(), cmd.to_string());
+                    }
+                }
+            }
         }
-    }
-    let config = RedoxerConfig {
-        qemu_binary: var("REDOXER_QEMU_BINARY").ok(),
-        qemu_args: var("REDOXER_QEMU_ARGS").ok(),
-        fuse: parse_bool_env("REDOXER_USE_FUSE"),
-    };
 
-    match inner(&arguments, &config, folder_opt, gui, output_opt) {
+        if config.arguments.is_empty() {
+            usage("");
+        }
+
+        config
+    }
+}
+
+pub fn main(args: &[String]) {
+    let config = RedoxerConfig::new(args.iter().cloned().skip(2));
+
+    match inner(&config) {
         Ok(code) => {
             process::exit(code);
         }
