@@ -1,4 +1,4 @@
-use anyhow::Context;
+use anyhow::{bail, Context};
 use std::collections::{HashMap, HashSet};
 use std::env::VarError;
 use std::path::{Path, PathBuf};
@@ -432,7 +432,7 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
             }
             Command::new("rsync")
                 .arg("--archive")
-                .arg(dest_dir.join(sysroot))
+                .arg(format!("{}/", dest_dir.join(sysroot).display()))
                 .arg(&dst_dir)
                 .status()
                 .and_then(status_error)
@@ -449,10 +449,7 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
     Ok(code)
 }
 
-fn usage(hint: &str) -> ! {
-    if !hint.is_empty() {
-        eprintln!("error: {}", hint);
-    }
+fn usage() -> ! {
     eprintln!("redoxer exec [-f|--folder folder] [-f|--folder folder:/path/in/redox] [-a|--artifact folder] [-a|--artifact folder:/path/in/redox] [-g|--gui] [-h|--help] [-i|--install-config] [-o|--output file] [--] <command> [arguments]...");
     process::exit(1);
 }
@@ -477,7 +474,7 @@ pub struct RedoxerExecConfig {
 }
 
 impl RedoxerExecConfig {
-    pub fn new(mut args: impl Iterator<Item = String>) -> Self {
+    pub fn new(mut args: impl Iterator<Item = String>) -> anyhow::Result<Self> {
         use std::env::var;
         fn parse_bool_env(name: &str) -> Option<bool> {
             match var(name).as_deref() {
@@ -488,6 +485,38 @@ impl RedoxerExecConfig {
                 Err(VarError::NotUnicode(_)) => panic!("non-utf8 argument for {}", name),
             }
         }
+
+        fn parse_folder(
+            map: &mut HashMap<String, String>,
+            folder: String,
+            argname: &str,
+        ) -> anyhow::Result<()> {
+            let (dir, sysroot): (String, String) = match folder
+                .chars()
+                .filter(|c| *c == ':')
+                .count()
+            {
+                0 => (folder, "/root".to_string()),
+                1 => {
+                    let mut split = folder.split(":");
+                    let r = (
+                        split.next().unwrap().to_string(),
+                        split.next().unwrap().to_string(),
+                    );
+                    if !r.1.starts_with("/") {
+                        bail!("path on {argname} with format 'directory:path' must be an absolute path (starting with '/')");
+                    }
+                    r
+                }
+                _ => bail!("{argname} can be 'directory' or 'directory:path'"),
+            };
+            if map.insert(sysroot[1..].to_string(), dir).is_some() {
+                bail!("path on {argname} with format 'directory:path' must be unique");
+            }
+
+            Ok(())
+        }
+
         let mut config = RedoxerExecConfig {
             qemu_binary: var("REDOXER_QEMU_BINARY").ok(),
             qemu_args: var("REDOXER_QEMU_ARGS").ok(),
@@ -504,12 +533,12 @@ impl RedoxerExecConfig {
         while let Some(arg) = args.next() {
             match (arg.as_str(), matching) {
                 ("-f" | "--folder", true) => match args.next() {
-                    Some(folder) => parse_folder(&mut config.folders, folder, "--folder"),
-                    None => usage("--folder requires a path to a directory"),
+                    Some(folder) => parse_folder(&mut config.folders, folder, "--folder")?,
+                    None => bail!("--folder requires a path to a directory"),
                 },
                 ("-a" | "--artifact", true) => match args.next() {
-                    Some(folder) => parse_folder(&mut config.artifacts, folder, "--artifact"),
-                    None => usage("--folder requires a path to a directory"),
+                    Some(folder) => parse_folder(&mut config.artifacts, folder, "--artifact")?,
+                    None => bail!("--folder requires a path to a directory"),
                 },
                 ("-g" | "--gui", true) => {
                     config.config_name = "gui".into();
@@ -521,17 +550,17 @@ impl RedoxerExecConfig {
                         config.config_name =
                             path.file_stem().unwrap().to_string_lossy().to_string();
                         if &config.config_name == "base" || &config.config_name == "gui" {
-                            usage("--install-config file path cannot be 'base' or 'gui'");
+                            bail!("--install-config file path cannot be 'base' or 'gui'");
                         }
                         config.config_toml =
                             fs::read_to_string(path).expect("unable to read --install-config file");
                     }
-                    None => usage("--output requires a path to a directory"),
+                    None => bail!("--output requires a path to a directory"),
                 },
-                ("-h" | "--help", true) => usage(""),
+                ("-h" | "--help", true) => bail!(""),
                 ("-o" | "--output", true) => match args.next() {
                     Some(output) => config.output = Some(output),
-                    None => usage("--output requires a path to a directory"),
+                    None => bail!("--output requires a path to a directory"),
                 },
                 ("--", true) => matching = false,
                 _ => {
@@ -557,14 +586,10 @@ impl RedoxerExecConfig {
         }
 
         if config.artifacts.len() > 0 && !config.fuse {
-            usage("--artifact requires REDOXER_USE_FUSE=true");
+            bail!("--artifact requires REDOXER_USE_FUSE=true");
         }
 
-        if config.arguments.is_empty() {
-            usage("");
-        }
-
-        config
+        Ok(config)
     }
 
     pub fn to_args(&self) -> Vec<String> {
@@ -601,32 +626,18 @@ impl RedoxerExecConfig {
     }
 }
 
-fn parse_folder(map: &mut HashMap<String, String>, folder: String, argname: &str) {
-    let (dir, sysroot): (String, String) = match folder.chars().filter(|c| *c == ':').count() {
-        0 => (folder, "/root".to_string()),
-        1 => {
-            let mut split = folder.split(":");
-            let r = (
-                split.next().unwrap().to_string(),
-                split.next().unwrap().to_string(),
-            );
-            if !r.1.starts_with("/") {
-                usage(&format!("path on {argname} with format 'directory:path' must be an absolute path (starting with '/')"));
-            }
-            r
-        }
-        _ => usage(&format!("{argname} can be 'directory' or 'directory:path'")),
-    };
-    if map.insert(sysroot[1..].to_string(), dir).is_some() {
-        usage(&format!(
-            "path on {argname} with format 'directory:path' must be unique"
-        ));
-    }
-}
-
 pub fn main(args: &[String]) {
-    let config = RedoxerExecConfig::new(args.iter().cloned().skip(2));
+    let config = match RedoxerExecConfig::new(args.iter().cloned().skip(2)) {
+        Ok(config) => config,
+        Err(err) => {
+            eprintln!("{:?}", err);
+            usage();
+        }
+    };
 
+    if config.arguments.is_empty() {
+        usage();
+    }
     match inner(&config) {
         Ok(code) => {
             process::exit(code);
