@@ -337,6 +337,10 @@ fn inner(config: &RedoxerConfig) -> anyhow::Result<i32> {
                 eprintln!("redoxer: copying '{folder}' to '/{sysroot}'",);
 
                 let dst_dir = dest_dir.join(sysroot);
+                if !dst_dir.is_dir() {
+                    fs::create_dir_all(&dst_dir)
+                        .context("unable to create destination directory")?;
+                }
                 Command::new("rsync")
                     .arg("--archive")
                     .arg(&folder)
