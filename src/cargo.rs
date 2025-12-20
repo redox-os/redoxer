@@ -1,6 +1,9 @@
 use std::ffi::OsString;
 use std::{env, io, process};
 
+use anyhow::Context;
+
+use crate::exec::RedoxerExecConfig;
 use crate::{status_error, target, toolchain};
 
 fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
@@ -40,42 +43,22 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
     let command = args.next().unwrap();
     let subcommand = args.next().unwrap();
 
-    let mut arguments = Vec::new();
-    let mut matching = true;
-    let mut gui = false;
-    let mut output_opt = None;
-    while let Some(arg) = args.next() {
-        match arg.as_str() {
-            "-g" | "--gui" if matching => {
-                gui = true;
-            }
-            "-o" | "--output" if matching => match args.next() {
-                Some(output) => {
-                    output_opt = Some(output);
-                }
-                None => {
-                    //TODO: usage();
-                }
-            },
-            "--" if matching => {
-                matching = false;
-            }
-            _ => {
-                arguments.push(arg);
-            }
-        }
-    }
+    let mut runner_config =
+        RedoxerExecConfig::new(args).context("Unable to parse exec configuration")?;
+    let arguments = runner_config.arguments.clone();
+    runner_config.arguments = Vec::new();
+    runner_config
+        .folders
+        .insert("root".to_string(), ".".to_string());
 
-    // TODO: Ensure no spaces in command
-    let runner = format!(
-        "{} exec --folder .{}{}",
-        command,
-        if gui { " --gui" } else { "" },
-        match output_opt {
-            Some(output) => format!(" --output {}", output),
-            None => String::new(),
+    let mut runner = vec![command, "exec".to_string()];
+    runner.extend(runner_config.to_args().into_iter().map(|s| {
+        if s.contains(&[' ', '"', '\'', '\n']) {
+            format!("{:?}", s)
+        } else {
+            s
         }
-    );
+    }));
 
     let cc_target_var = target().replace("-", "_");
     let cargo_target_var = cc_target_var.to_uppercase();
@@ -85,7 +68,10 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
         .arg("--target")
         .arg(target())
         .args(arguments)
-        .env(format!("CARGO_TARGET_{}_RUNNER", cargo_target_var), runner)
+        .env(
+            format!("CARGO_TARGET_{}_RUNNER", cargo_target_var),
+            runner.join(" "),
+        )
         .env("CARGO_ENCODED_RUSTFLAGS", rustflags)
         .status()
         .and_then(status_error)?;
