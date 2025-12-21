@@ -23,6 +23,7 @@ cargo-test:
   script:
     - apt update && apt install -y fuse3 libfuse3-dev
     - cargo test --locked
+    - cargo test --no-default-features --locked
 
 exec-test:
   image: "redoxos/redoxer:latest"
