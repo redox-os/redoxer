@@ -1,6 +1,7 @@
-use anyhow::Context;
-use redoxfs::{DiskFile, FileSystem};
+use anyhow::{anyhow, bail, Context};
+use redoxfs::{BlockAddr, BlockMeta, DiskFile, FileSystem};
 use std::fs::File;
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::mpsc::{channel, TryRecvError};
@@ -203,7 +204,7 @@ fn read_bootloader(
     Ok((bootloader_bios, bootloader_efi))
 }
 
-pub(crate) fn extract_tar(tar_file: &Path, dest_dir: &Path) -> Result<(), anyhow::Error> {
+pub(crate) fn extract_tar(tar_file: &Path, dest_dir: &Path) -> anyhow::Result<()> {
     Command::new("tar")
         .arg("-x")
         .arg("-p")
@@ -217,4 +218,164 @@ pub(crate) fn extract_tar(tar_file: &Path, dest_dir: &Path) -> Result<(), anyhow
         .and_then(status_error)
         .context("tar extract failed")?;
     Ok(())
+}
+
+pub(crate) fn shrink_disk(disk_path: &Path) -> anyhow::Result<()> {
+    let shrink_size = {
+        let mut fs = open_fs(disk_path)?;
+        let (old_size, new_size) = resize(&mut fs, true).map_err(|e| anyhow!(e))?;
+        if old_size > new_size {
+            Some(old_size - new_size)
+        } else {
+            None
+        }
+    };
+
+    if let Some(shrink_size) = shrink_size {
+        let f = open_disk(disk_path)?.file;
+        let size = f
+            .metadata()
+            .context("Unable to get disk file metadata")?
+            .size();
+        f.set_len(size - shrink_size)
+            .context("Unable to shrink disk file metadata")?;
+    }
+
+    Ok(())
+}
+
+pub(crate) fn expand_disk(disk_path: &Path, desired_size: u64) -> anyhow::Result<()> {
+    {
+        let disk = open_disk(disk_path)?;
+        let size = disk
+            .file
+            .metadata()
+            .context("Unable to get disk file metadata")?
+            .size();
+        if size < desired_size {
+            disk.file
+                .set_len(desired_size)
+                .context("Unable to expand disk file metadata")?;
+        } else {
+            return Ok(());
+        };
+    }
+
+    {
+        let mut fs = open_fs(disk_path)?;
+        resize(&mut fs, false).map_err(|e| anyhow!(e))?;
+    }
+
+    Ok(())
+}
+
+fn open_fs(disk_path: &Path) -> anyhow::Result<FileSystem<DiskFile>> {
+    let disk = open_disk(disk_path)?;
+    let fs = match FileSystem::open(disk, None, None, true) {
+        Ok(fs) => fs,
+        Err(err) => {
+            bail!(
+                "redoxfs-resize: failed to open filesystem on {}: {}",
+                disk_path.display(),
+                err
+            );
+        }
+    };
+    Ok(fs)
+}
+
+fn open_disk(disk_path: &Path) -> anyhow::Result<DiskFile> {
+    let disk = match DiskFile::open(&disk_path) {
+        Ok(disk) => disk,
+        Err(err) => {
+            bail!(
+                "redoxfs-resize: failed to open disk image {}: {}",
+                disk_path.display(),
+                err
+            );
+        }
+    };
+    Ok(disk)
+}
+
+// copied from redoxfs-resize
+fn resize<D: redoxfs::Disk>(fs: &mut FileSystem<D>, shrink: bool) -> Result<(u64, u64), String> {
+    let disk_size = fs
+        .disk
+        .size()
+        .map_err(|err| format!("failed to read disk size: {}", err))?;
+
+    // Find contiguous free region
+    //TODO: better error management
+    let mut last_free = None;
+    let mut last_end = 0;
+    fs.tx(|tx| {
+        let mut alloc_ptr = tx.header.alloc;
+        while !alloc_ptr.is_null() {
+            let alloc = tx.read_block(alloc_ptr)?;
+            alloc_ptr = alloc.data().prev;
+            for entry in alloc.data().entries.iter() {
+                let count = entry.count();
+                if count <= 0 {
+                    continue;
+                }
+                let end = entry.index() + count as u64;
+                if end > last_end {
+                    last_free = Some(*entry);
+                    last_end = end;
+                }
+            }
+        }
+        Ok(())
+    })
+    .map_err(|err| format!("failed to read alloc log: {}", err))?;
+
+    let old_size = fs.header.size();
+    let min_size = if let Some(entry) = last_free {
+        entry.index() * redoxfs::BLOCK_SIZE
+    } else {
+        old_size
+    };
+    let max_size = disk_size - (fs.block * redoxfs::BLOCK_SIZE);
+
+    let new_size = if shrink { min_size } else { max_size };
+
+    let old_blocks = old_size / redoxfs::BLOCK_SIZE;
+    let new_blocks = new_size / redoxfs::BLOCK_SIZE;
+    let (start, end, shrink) = if new_size == old_size {
+        return Ok((old_size, new_size));
+    } else if new_size < old_size {
+        (new_blocks, old_blocks, true)
+    } else {
+        (old_blocks, new_blocks, false)
+    };
+
+    // Allocate or deallocate blocks as needed
+    unsafe {
+        let allocator = fs.allocator_mut();
+        for index in start..end {
+            if shrink {
+                //TODO: replace assert with error?
+                let addr = BlockAddr::new(index as u64, BlockMeta::default());
+                assert_eq!(allocator.allocate_exact(addr), Some(addr));
+            } else {
+                let addr = BlockAddr::new(index as u64, BlockMeta::default());
+                allocator.deallocate(addr);
+            }
+        }
+    }
+
+    fs.tx(|tx| {
+        // Update header
+        tx.header.size = new_size.into();
+        tx.header_changed = true;
+
+        // Sync with squash
+        tx.sync(true)?;
+
+        Ok(())
+    })
+    .map_err(|err| format!("transaction failed: {}", err))?;
+
+    Ok((old_size, new_size))
 }
