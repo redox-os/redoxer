@@ -5,7 +5,10 @@ use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::{fs, io};
 
-use crate::redoxfs::{archive_image, extract_tar, run_install_mount, run_install_to_dir, RedoxFs};
+use crate::redoxfs::{
+    archive_image, expand_disk, extract_tar, run_install_mount, run_install_to_dir, shrink_disk,
+    RedoxFs,
+};
 use crate::writer::write_redoxerd_config;
 use crate::{host_target, redoxer_dir, status_error, target};
 
@@ -202,6 +205,12 @@ fn base(
                 &base_dir,
                 &base_partial,
             )?;
+
+            // only shrink disk outside CI
+            if !base_tar.exists() {
+                eprintln!("redoxer: shrinking {}", name);
+                shrink_disk(&base_partial)?;
+            }
         } else {
             run_install_to_dir(config, &base_dir)?;
 
@@ -219,7 +228,9 @@ fn base(
         }
 
         fs::rename(&base_partial, &base_file)?;
-        fs::remove_dir_all(&base_dir)?;
+        if base_dir.is_dir() {
+            fs::remove_dir_all(&base_dir)?;
+        }
         fs::write(base_toml, config_str)?;
     }
     Ok((base_file, has_orbital))
@@ -303,6 +314,7 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
     )
     .context("unable to init base")?;
 
+    eprintln!("redoxer: creating temporary disk");
     let tempdir = tempfile::tempdir().context("unable to create tempdir")?;
     let redoxer_bin = tempdir.path().join("redoxer.bin");
     let dest_dir = tempdir.path().join("redoxer");
@@ -315,6 +327,8 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
                 .status()
                 .and_then(status_error)
                 .context("copy base to redoxer bin failed")?;
+
+            expand_disk(&redoxer_bin, qemu_disk_size())?;
         }
 
         fs::create_dir_all(&dest_dir).context("unable to create redoxer dir")?;
