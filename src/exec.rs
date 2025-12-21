@@ -303,6 +303,7 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
     )
     .context("unable to init base")?;
 
+    eprintln!("redoxer: creating temporary disk");
     let tempdir = tempfile::tempdir().context("unable to create tempdir")?;
     let redoxer_bin = tempdir.path().join("redoxer.bin");
     let dest_dir = tempdir.path().join("redoxer");
