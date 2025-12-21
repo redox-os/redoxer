@@ -21,6 +21,8 @@ prompt = false
 
 [packages.findutils]
 
+[packages.gnu-make]
+
 [packages.ion]
 
 [packages.kernel]
@@ -36,6 +38,8 @@ prompt = false
 [packages.pkgutils]
 
 [packages.relibc]
+
+[packages.sed]
 
 [packages.userutils]
 
