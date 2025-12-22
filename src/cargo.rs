@@ -1,9 +1,6 @@
 use std::ffi::OsString;
 use std::{env, io, process};
 
-use anyhow::Context;
-
-use crate::exec::RedoxerExecConfig;
 use crate::{status_error, target, toolchain};
 
 fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
@@ -43,22 +40,47 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
     let command = args.next().unwrap();
     let subcommand = args.next().unwrap();
 
-    let mut runner_config =
-        RedoxerExecConfig::new(args).context("Unable to parse exec configuration")?;
-    let arguments = runner_config.arguments.clone();
-    runner_config.arguments = Vec::new();
-    runner_config
-        .folders
-        .insert("root".to_string(), ".".to_string());
+    #[cfg(feature = "cli-exec")]
+    let (runner, arguments) = {
+        use anyhow::Context;
+        let mut runner_config = crate::exec::RedoxerExecConfig::new(args)
+            .context("Unable to parse exec configuration")?;
+        let arguments = runner_config.arguments.clone();
+        runner_config.arguments = Vec::new();
+        runner_config
+            .folders
+            .insert("root".to_string(), ".".to_string());
 
-    let mut runner = vec![command, "exec".to_string()];
-    runner.extend(runner_config.to_args().into_iter().map(|s| {
-        if s.contains(&[' ', '"', '\'', '\n']) {
-            format!("{:?}", s)
-        } else {
-            s
+        let mut runner = vec![command, "exec".to_string()];
+        runner.extend(runner_config.to_args().into_iter().map(|s| {
+            if s.contains(&[' ', '"', '\'', '\n']) {
+                format!("{:?}", s)
+            } else {
+                s
+            }
+        }));
+        (runner.join(" "), arguments)
+    };
+    #[cfg(not(feature = "cli-exec"))]
+    let (runner, arguments) = {
+        let mut matching = true;
+        let mut arguments = Vec::new();
+        while let Some(arg) = args.next() {
+            match (arg.as_str(), matching) {
+                (
+                    "-f" | "--folder" | "-a" | "--artifact" | "-i" | "--install-config" | "-o"
+                    | "--output" | "-g" | "--gui" | "-h" | "--help",
+                    true,
+                ) => anyhow::bail!("feature 'cli-exec' is not compiled, please omit exec args"),
+                ("--", true) => matching = false,
+                _ => {
+                    matching = false;
+                    arguments.push(arg);
+                }
+            }
         }
-    }));
+        (format!("{command} exec"), arguments)
+    };
 
     let cc_target_var = target().replace("-", "_");
     let cargo_target_var = cc_target_var.to_uppercase();
@@ -68,10 +90,7 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
         .arg("--target")
         .arg(target())
         .args(arguments)
-        .env(
-            format!("CARGO_TARGET_{}_RUNNER", cargo_target_var),
-            runner.join(" "),
-        )
+        .env(format!("CARGO_TARGET_{}_RUNNER", cargo_target_var), runner)
         .env("CARGO_ENCODED_RUSTFLAGS", rustflags)
         .status()
         .and_then(status_error)?;
