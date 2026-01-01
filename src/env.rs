@@ -2,7 +2,7 @@ use std::{collections::HashMap, env, ffi, process};
 
 use anyhow::{anyhow, Context};
 
-use crate::{gnu_target, status_error, target, toolchain};
+use crate::{gnu_target, host_target, status_error, target, toolchain};
 
 pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Command> {
     let toolchain_dir = toolchain().context("unable to init toolchain")?;
@@ -135,6 +135,16 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
     h.insert("RANLIB", format!("{}-gcc-ranlib", gnu_target));
     h.insert("READELF", format!("{}-readelf", gnu_target));
     h.insert("STRIP", format!("{}-strip", gnu_target));
+
+    if host_target() == target() {
+        for (k, v) in h.iter_mut() {
+            if let Some(env) = std::env::var(format!("REDOXER_HOST_{}", k)).ok() {
+                if env.len() > 0 {
+                    *v = env;
+                }
+            }
+        }
+    }
     h
 }
 

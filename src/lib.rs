@@ -83,13 +83,19 @@ pub fn gnu_target() -> &'static str {
         "riscv64gc-unknown-redox" => "riscv64-unknown-redox",
         "aarch64-unknown-linux-gnu" => "aarch64-linux-gnu",
         "x86_64-unknown-linux-gnu" => "x86_64-linux-gnu",
+        "aarch64-unknown-linux-musl" => "aarch64-linux-musl",
+        "x86_64-unknown-linux-musl" => "x86_64-linux-musl",
         rust_target => rust_target,
     }
 }
 
 pub fn host_target() -> &'static str {
     let os = if cfg!(target_os = "linux") {
-        "linux-gnu"
+        if cfg!(target_env = "musl") {
+            "linux-musl"
+        } else {
+            "linux-gnu"
+        }
     } else if cfg!(target_os = "redox") {
         "redox"
     } else if cfg!(target_os = "macos") {
@@ -113,6 +119,8 @@ pub fn host_target() -> &'static str {
         // it doesn't have the official cross compiler toolchain bundled
         ("x86_64", "redox") => "x86_64-unknown-redox",
         ("aarch64", "redox") => "aarch64-unknown-redox",
+        ("x86_64", "linux-musl") => "x86_64-unknown-linux-musl",
+        ("aarch64", "linux-musl") => "aarch64-unknown-linux-musl",
         ("x86_64", "macos") => "x86_64-apple-darwin",
         ("aarch64", "macos") => "aarch64-apple-darwin",
         ("x86_64", "freebsd") => "x86_64-unknown-freebsd",
