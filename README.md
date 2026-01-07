@@ -105,20 +105,19 @@ redoxer exec echo hello
 + `*-unknown-freebsd`
 + `*-apple-darwin`
 
-This feature is mainly used for [Redox build system](https://gitlab.redox-os.org/redox-os/redox). For other than Linux and Redox, you must supply additional environments to the correct paths or binary name for GCC and Binutils. You can also use it to specify other compiler or different version of GCC. Here's an example for using the system default:
+This feature is mainly used for [Redox build system](https://gitlab.redox-os.org/redox-os/redox). For other than Linux and Redox, you must supply additional environments to the correct paths or binary name for GCC and Binutils. You can also use it to specify other compiler or different version of GCC. Here's an example for using the system default, which also being the default values:
 
 ```sh
-export REDOXER_HOST_AR=ar
+export REDOXER_HOST_AR=gcc-ar
 export REDOXER_HOST_AS=as
 export REDOXER_HOST_CC=cc
 export REDOXER_HOST_CXX=c++
 export REDOXER_HOST_LD=ld
-export REDOXER_HOST_NM=nm
+export REDOXER_HOST_NM=gcc-nm
 export REDOXER_HOST_OBJCOPY=objcopy
 export REDOXER_HOST_OBJDUMP=objdump
 export REDOXER_HOST_PKG_CONFIG=pkg-config
-export REDOXER_HOST_RANLIB=ranlib
+export REDOXER_HOST_RANLIB=gcc-ranlib
 export REDOXER_HOST_READELF=readelf
 export REDOXER_HOST_STRIP=strip
 ```
-
