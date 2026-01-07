@@ -49,7 +49,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     command.env("PKG_CONFIG_FOR_BUILD", "pkg-config");
     command.env(
         "FIND",
-        if cfg!(any(target_os = "macos", target_os = "freebsd",)) {
+        if cfg!(any(target_os = "macos", target_os = "freebsd")) {
             "gfind"
         } else {
             "find"
@@ -121,22 +121,27 @@ fn inner<I: Iterator<Item = String>>(program: &str, args: I) -> anyhow::Result<(
 }
 
 fn generate_gnu_targets() -> HashMap<&'static str, String> {
-    let gnu_target = gnu_target();
+    let is_host = host_target() == target();
+    let target_prefix = if is_host {
+        "".to_string()
+    } else {
+        format!("{}-", gnu_target())
+    };
     let mut h = HashMap::new();
-    h.insert("AR", format!("{}-gcc-ar", gnu_target));
-    h.insert("AS", format!("{}-as", gnu_target));
-    h.insert("CC", format!("{}-gcc", gnu_target));
-    h.insert("CXX", format!("{}-g++", gnu_target));
-    h.insert("LD", format!("{}-ld", gnu_target));
-    h.insert("NM", format!("{}-gcc-nm", gnu_target));
-    h.insert("OBJCOPY", format!("{}-objcopy", gnu_target));
-    h.insert("OBJDUMP", format!("{}-objdump", gnu_target));
-    h.insert("PKG_CONFIG", format!("{}-pkg-config", gnu_target));
-    h.insert("RANLIB", format!("{}-gcc-ranlib", gnu_target));
-    h.insert("READELF", format!("{}-readelf", gnu_target));
-    h.insert("STRIP", format!("{}-strip", gnu_target));
+    h.insert("AR", format!("{}gcc-ar", target_prefix));
+    h.insert("AS", format!("{}as", target_prefix));
+    h.insert("CC", format!("{}gcc", target_prefix));
+    h.insert("CXX", format!("{}g++", target_prefix));
+    h.insert("LD", format!("{}ld", target_prefix));
+    h.insert("NM", format!("{}gcc-nm", target_prefix));
+    h.insert("OBJCOPY", format!("{}objcopy", target_prefix));
+    h.insert("OBJDUMP", format!("{}objdump", target_prefix));
+    h.insert("PKG_CONFIG", format!("{}pkg-config", target_prefix));
+    h.insert("RANLIB", format!("{}gcc-ranlib", target_prefix));
+    h.insert("READELF", format!("{}readelf", target_prefix));
+    h.insert("STRIP", format!("{}strip", target_prefix));
 
-    if host_target() == target() {
+    if is_host {
         for (k, v) in h.iter_mut() {
             if let Some(env) = std::env::var(format!("REDOXER_HOST_{}", k)).ok() {
                 if env.len() > 0 {
