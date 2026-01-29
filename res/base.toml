@@ -52,8 +52,8 @@ data = """
 rm -rf /tmp
 mkdir -m a=rwxt /tmp
 
-ipcd
-ptyd
+notify ipcd
+notify ptyd
 nowait sudo --daemon
 """
 symlink = false
@@ -248,8 +248,24 @@ recursive_chown = false
 postinstall = false
 
 [[files]]
-path = "/usr/share/fonts"
-data = "../../ui/fonts"
+path = "/ui"
+data = "usr/share/ui"
+symlink = true
+directory = false
+recursive_chown = false
+postinstall = false
+
+[[files]]
+path = "/usr/share/ui/fonts"
+data = "/usr/share/fonts"
+symlink = true
+directory = false
+recursive_chown = false
+postinstall = false
+
+[[files]]
+path = "/usr/share/ui/icons"
+data = "/usr/share/icons"
 symlink = true
 directory = false
 recursive_chown = false
@@ -385,7 +401,7 @@ postinstall = false
 [[files]]
 path = "/usr/lib/init.d/10_net"
 data = """
-smolnetd
+notify smolnetd
 nowait dhcpd
 """
 symlink = false
@@ -436,7 +452,7 @@ postinstall = false
 [[files]]
 path = "/usr/lib/init.d/10_net"
 data = """
-smolnetd
+notify smolnetd
 dhcpd
 """
 symlink = false
