@@ -66,8 +66,8 @@ fn toolchain_inner(is_update: bool, source_url: String) -> io::Result<PathBuf> {
             let shasum_file = toolchain_partial.join("SHA256SUM");
             download(&format!("{}/SHA256SUM", url), &shasum_file)?;
 
-            let prefix_tar = toolchain_partial.join("rust-install.tar.gz");
-            download(&format!("{}/rust-install.tar.gz", url), &prefix_tar)?;
+            let prefix_tar = toolchain_partial.join("relibc-install.tar.gz");
+            download(&format!("{}/relibc-install.tar.gz", url), &prefix_tar)?;
 
             if !shasum(&shasum_file)? {
                 return Err(io::Error::new(io::ErrorKind::Other, "shasum invalid"));
