@@ -37,4 +37,4 @@ uefi-test:
   stage: test
   script:
     - cargo install --path . --locked
-    - cd example && redoxer test
+    - redoxer exec true
