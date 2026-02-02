@@ -1277,7 +1277,7 @@ checksum = "3d0b95e02c851351f877147b7deea7b1afb1df71b63aa5f8270716e0c5720616"
 dependencies = [
  "bitflags 2.10.0",
  "libc",
- "redox_syscall 0.7.0",
+ "redox_syscall",
 ]
 
 [[package]]
@@ -1690,19 +1690,19 @@ dependencies = [
 
 [[package]]
 name = "redox-scheme"
-version = "0.8.3"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cea2668a5932f878a4298a1d7f8950249bbbb77120fb263da252c589152f5ea"
+checksum = "5eb0cee524a5c6e4db180250f699e101ee25f3f79ad2618527e539e028cb6722"
 dependencies = [
  "libredox",
- "redox_syscall 0.6.0",
+ "redox_syscall",
 ]
 
 [[package]]
 name = "redox_installer"
-version = "0.2.39"
+version = "0.2.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29ffbf7687db4e488c5d2e2b06051920d893f460b64f9125a1b9ffb16ce785fd"
+checksum = "6b055027e57ee333482fe22e179125f42643df7a5b63472fb111c429bf2885f1"
 dependencies = [
  "anyhow",
  "arg_parser",
@@ -1716,7 +1716,7 @@ dependencies = [
  "pkgar-keys",
  "rand",
  "redox-pkg",
- "redox_syscall 0.6.0",
+ "redox_syscall",
  "redoxfs",
  "rust-argon2",
  "serde",
@@ -1724,15 +1724,6 @@ dependencies = [
  "termion",
  "toml 0.8.23",
  "uuid",
-]
-
-[[package]]
-name = "redox_syscall"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec96166dafa0886eb81fe1c0a388bece180fbef2135f97c1e2cf8302e74b43b5"
-dependencies = [
- "bitflags 2.10.0",
 ]
 
 [[package]]
@@ -1781,7 +1772,7 @@ dependencies = [
  "proc-mounts",
  "redox-pkg",
  "redox_installer",
- "redox_syscall 0.6.0",
+ "redox_syscall",
  "redoxfs",
  "tempfile",
  "toml 0.9.8",
@@ -1789,9 +1780,9 @@ dependencies = [
 
 [[package]]
 name = "redoxfs"
-version = "0.8.6"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55071413aa5d1968624d51526d2f0e79a0a102da83c6f537d0e3f936dc5f6942"
+checksum = "f790d2ee811995ee2ba5dd7693fae50a222fa2ca529bfd3e23734ddc10f0a065"
 dependencies = [
  "aes",
  "argon2",
@@ -1810,7 +1801,7 @@ dependencies = [
  "range-tree",
  "redox-path",
  "redox-scheme",
- "redox_syscall 0.6.0",
+ "redox_syscall",
  "seahash",
  "termion",
  "uuid",
