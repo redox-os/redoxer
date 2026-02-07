@@ -1765,7 +1765,7 @@ dependencies = [
 
 [[package]]
 name = "redoxer"
-version = "0.2.61"
+version = "0.2.62"
 dependencies = [
  "anyhow",
  "dirs 6.0.0",
