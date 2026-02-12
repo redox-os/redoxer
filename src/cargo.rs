@@ -1,42 +1,8 @@
-use std::ffi::OsString;
-use std::{env, io, process};
+use std::process;
 
-use crate::{status_error, target, toolchain};
+use crate::{status_error, target};
 
 fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
-    let toolchain_dir = toolchain()?;
-
-    // PATH must be set first so cargo is sourced from the toolchain path
-    {
-        let path = env::var_os("PATH").unwrap_or(OsString::new());
-        let mut paths = env::split_paths(&path).collect::<Vec<_>>();
-        paths.insert(0, toolchain_dir.join("bin"));
-        let new_path =
-            env::join_paths(paths).map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
-        unsafe {
-            env::set_var("PATH", new_path);
-        }
-    }
-
-    // Use CARGO_ENCODED_RUSTFLAGS to handle spaces
-    let mut rustflags = format!(
-        "-L\x1fnative={}",
-        toolchain_dir.join(target()).join("lib").display()
-    );
-
-    if let Ok(user_rustflag) = env::var("RUSTFLAGS") {
-        rustflags = format!("{}\x1f{}", rustflags, user_rustflag.replace(" ", "\x1f"));
-    }
-
-    #[cfg(feature = "cli-pkg")]
-    if let Some(sysroot) = crate::pkg::get_sysroot() {
-        rustflags = format!(
-            "{}\x1f-L\x1fnative={}",
-            rustflags,
-            sysroot.join("lib").canonicalize()?.display()
-        );
-    }
-
     let command = args.next().unwrap();
     let subcommand = args.next().unwrap();
 
@@ -91,7 +57,6 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
         .arg(target())
         .args(arguments)
         .env(format!("CARGO_TARGET_{}_RUNNER", cargo_target_var), runner)
-        .env("CARGO_ENCODED_RUSTFLAGS", rustflags)
         .status()
         .and_then(status_error)?;
 
