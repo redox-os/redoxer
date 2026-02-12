@@ -18,6 +18,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
         }
     }
 
+    // CC
     let target = target();
     let gnu_target = gnu_target();
     let gnu_targets = generate_gnu_targets();
@@ -39,6 +40,8 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
         command.env(k, v);
         command.env(format!("{k}_{cc_target_var}"), &v);
     }
+
+    // CARGO
     command.env(
         format!("CARGO_TARGET_{}_LINKER", cargo_target_var),
         gnu_targets.get("CC").unwrap(),
@@ -46,20 +49,26 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     command.env("RUSTUP_TOOLCHAIN", &toolchain_dir);
     command.env("TARGET", target);
     command.env("GNU_TARGET", gnu_target);
-    command.env("PKG_CONFIG_FOR_BUILD", "pkg-config");
-    command.env(
-        "FIND",
-        if cfg!(any(target_os = "macos", target_os = "freebsd")) {
-            "gfind"
-        } else {
-            "find"
-        },
+
+    // RUSTFLAGS
+    let mut rustflags = format!(
+        "-L\x1fnative={}",
+        toolchain_dir.join(target).join("lib").display()
     );
-    if cc_target_var == "riscv64gc_unknown_redox" {
-        command.env(
-            "CFLAGS_riscv64gc_unknown_redox",
-            "-march=rv64gc -mabi=lp64d",
-        );
+
+    if let Ok(user_rustflag) = env::var("RUSTFLAGS") {
+        rustflags = format!("{}\x1f{}", rustflags, user_rustflag.replace(" ", "\x1f"));
+    }
+
+    // CPPFLAGS
+    let mut cppflags = env::var("CPPFLAGS").unwrap_or_else(|_| "".to_string());
+    if !cppflags.is_empty() {
+        cppflags += " ";
+    }
+    match target {
+        "aarch64-unknown-redox" => cppflags += "-mno-outline-atomics",
+        "riscv64gc-unknown-redox" => cppflags += "-march=rv64gc -mabi=lp64d",
+        _ => {}
     }
 
     #[cfg(feature = "cli-pkg")]
@@ -73,17 +82,15 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
             format!("PKG_CONFIG_SYSROOT_DIR_{}", cc_target_var),
             &sysroot,
         );
+        rustflags = format!(
+            "{}\x1f-L\x1fnative={}",
+            rustflags,
+            sysroot.join("lib").canonicalize()?.display()
+        );
+
         if is_cc {
             let includedir = sysroot.join("include").canonicalize()?;
-            let mut cppflags = format!("-I{}", includedir.display());
-
-            if let Ok(user_cppflags) = env::var("CPPFLAGS") {
-                cppflags = format!("{} {}", cppflags, user_cppflags);
-            }
-            if cc_target_var == "riscv64gc_unknown_redox" {
-                // TODO: should be set also without sysroot
-                cppflags = format!("{} -march=rv64gc -mabi=lp64d", cppflags);
-            }
+            cppflags += &format!(" -I{}", includedir.display());
 
             let libdir = sysroot.join("lib").canonicalize()?;
             let mut ldflags = format!(
@@ -96,10 +103,15 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
                 ldflags = format!("{} {}", ldflags, user_ldflags);
             }
 
-            command.env("CPPFLAGS", cppflags);
             command.env("LDFLAGS", ldflags);
         }
     }
+
+    command.env("CPPFLAGS", &cppflags);
+    command.env(format!("CFLAGS_{}", cc_target_var), &cppflags);
+    command.env(format!("CXXFLAGS_{}", cc_target_var), &cppflags);
+    command.env("CARGO_ENCODED_RUSTFLAGS", rustflags);
+    command.env_remove("RUSTFLAGS");
 
     Ok(command)
 }
