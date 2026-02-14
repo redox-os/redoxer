@@ -50,15 +50,15 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     command.env("TARGET", target);
     command.env("GNU_TARGET", gnu_target);
 
-    // RUSTFLAGS
-    let mut rustflags = format!(
-        "-L\x1fnative={}",
-        toolchain_dir.join(target).join("lib").display()
-    );
-
-    if let Ok(user_rustflag) = env::var("RUSTFLAGS") {
-        rustflags = format!("{}\x1f{}", rustflags, user_rustflag.replace(" ", "\x1f"));
-    }
+    // RUSTFLAGS, TODO:
+    // 1. we're setting global RUSTFLAGS to per-target RUSTFLAGS
+    //      without a way to let user leave global RUSTFLAGS
+    //      but that probably is ok, because no usecase to it
+    // 2. Global RUSTFLAGS is really confusing because of this issue
+    //      https://github.com/rust-lang/cargo/issues/4423
+    //      which claims there's no RUSTFLAGS for build.rs
+    // 3. There are no CARGO_TARGET_xxx_ENCODED_RUSTFLAGS
+    let mut rustflags = env::var("RUSTFLAGS").unwrap_or("".to_string());
 
     // CPPFLAGS
     let mut cppflags = env::var("CPPFLAGS").unwrap_or_else(|_| "".to_string());
@@ -83,7 +83,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
             &sysroot,
         );
         rustflags = format!(
-            "{}\x1f-L\x1fnative={}",
+            "{} -L native={}",
             rustflags,
             sysroot.join("lib").canonicalize()?.display()
         );
@@ -107,11 +107,18 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
         }
     }
 
-    command.env("CPPFLAGS", &cppflags);
-    command.env(format!("CFLAGS_{}", cc_target_var), &cppflags);
-    command.env(format!("CXXFLAGS_{}", cc_target_var), &cppflags);
-    command.env("CARGO_ENCODED_RUSTFLAGS", rustflags);
-    command.env_remove("RUSTFLAGS");
+    if !cppflags.is_empty() {
+        command.env("CPPFLAGS", &cppflags);
+        command.env(format!("CFLAGS_{}", cc_target_var), &cppflags);
+        command.env(format!("CXXFLAGS_{}", cc_target_var), &cppflags);
+    }
+    if !rustflags.is_empty() {
+        command.env(
+            format!("CARGO_TARGET_{}_RUSTFLAGS", cargo_target_var),
+            rustflags,
+        );
+        command.env_remove("RUSTFLAGS");
+    }
 
     Ok(command)
 }
