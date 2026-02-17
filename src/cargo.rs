@@ -19,7 +19,7 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
 
         let mut runner = vec![command, "exec".to_string()];
         runner.extend(runner_config.to_args().into_iter().map(|s| {
-            if s.contains(&[' ', '"', '\'', '\n']) {
+            if s.contains([' ', '"', '\'', '\n']) {
                 format!("{:?}", s)
             } else {
                 s

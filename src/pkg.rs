@@ -88,12 +88,12 @@ pub fn main(args: &[String]) {
         i += 1;
     }
 
-    if pkgs.len() == 0 {
+    if pkgs.is_empty() {
         pkg_usage();
     }
 
     let sysroot = get_sysroot()
-        .or_else(|| get_cargo_sysroot_default_path())
+        .or_else(get_cargo_sysroot_default_path)
         .expect("Please define REDOXER_SYSROOT as destination to install packages");
 
     let source = env::var("REDOXER_PKG_SOURCE").unwrap_or(DEFAULT_PKG_SOURCE.to_string());
@@ -123,7 +123,7 @@ pub fn get_sysroot() -> Option<PathBuf> {
             if path.join("lib").is_dir() {
                 return Some(path);
             }
-            return None;
+            None
         })
 }
 
@@ -139,10 +139,10 @@ fn pkg_usage() {
     eprintln!("redoxer pkg [install|remove|update] pkg-1 pkg-2 ...");
     eprintln!(" arguments:");
     eprintln!("   [install|remove|update]  whether to install, update, or remove pkg (optional, default is install)");
-    eprintln!("");
+    eprintln!();
     eprintln!(" environment variables:");
     eprintln!("   REDOXER_SYSROOT          where to install sysroot (required when no Cargo.toml)");
     eprintln!("   REDOXER_PKG_SOURCE       whether to install custom source instead of {DEFAULT_PKG_SOURCE}");
-    eprintln!("");
+    eprintln!();
     process::exit(0);
 }
