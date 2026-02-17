@@ -9,7 +9,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
 
     // PATH must be set first so cargo is sourced from the toolchain path
     {
-        let path = env::var_os("PATH").unwrap_or(ffi::OsString::new());
+        let path = env::var_os("PATH").unwrap_or_default();
         let mut paths = env::split_paths(&path).collect::<Vec<_>>();
         paths.insert(0, toolchain_dir.join("bin"));
         let new_path = env::join_paths(paths)?;
@@ -31,14 +31,14 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     for (k, v) in gnu_targets.iter() {
         if *k == "CC" || *k == "CXX" {
             if let Ok(cc_wrapper) = std::env::var("CC_WRAPPER") {
-                if cc_wrapper.len() > 0 {
+                if !cc_wrapper.is_empty() {
                     command.env(k, format!("{cc_wrapper} {v}"));
                     continue;
                 }
             }
         }
         command.env(k, v);
-        command.env(format!("{k}_{cc_target_var}"), &v);
+        command.env(format!("{k}_{cc_target_var}"), v);
     }
 
     // CARGO
@@ -162,8 +162,8 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
 
     if is_host {
         for (k, v) in h.iter_mut() {
-            if let Some(env) = std::env::var(format!("REDOXER_HOST_{}", k)).ok() {
-                if env.len() > 0 {
+            if let Ok(env) = std::env::var(format!("REDOXER_HOST_{}", k)) {
+                if !env.is_empty() {
                     *v = env;
                 }
             }

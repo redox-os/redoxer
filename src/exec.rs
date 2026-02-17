@@ -15,7 +15,7 @@ use crate::{host_target, redoxer_dir, status_error, target};
 // extra disk space to fit large projects
 const DISK_SIZE: u64 = 3 * 1024 * 1024 * 1024;
 // need to fit under the default RAM
-const DISK_SIZE_LIVE: u64 = 1 * 1024 * 1024 * 1024;
+const DISK_SIZE_LIVE: u64 = 1024 * 1024 * 1024;
 
 pub fn qemu_executable() -> &'static str {
     match target() {
@@ -116,8 +116,8 @@ pub fn qemu_default_args() -> Vec<&'static str> {
     default_args
 }
 
-static BASE_TOML: &'static str = include_str!("../res/base.toml");
-static GUI_TOML: &'static str = include_str!("../res/gui.toml");
+static BASE_TOML: &str = include_str!("../res/base.toml");
+static GUI_TOML: &str = include_str!("../res/gui.toml");
 
 fn bootloader() -> anyhow::Result<PathBuf> {
     let bootloader_bin = redoxer_dir().join("bootloader.bin");
@@ -140,10 +140,10 @@ fn bootloader() -> anyhow::Result<PathBuf> {
             .packages
             .insert("bootloader".to_string(), Default::default());
         redox_installer::install(config, &bootloader_dir)
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
+            .map_err(|err| io::Error::other(format!("{}", err)))?;
 
         fs::rename(
-            &bootloader_dir.join(if qemu_use_uefi() {
+            bootloader_dir.join(if qemu_use_uefi() {
                 "boot/bootloader-live.efi"
             } else {
                 "boot/bootloader.bios"
@@ -173,7 +173,7 @@ fn base(
 
     if base_toml.is_file() && base_file.is_file() {
         let r = fs::read_to_string(&base_toml).context("Unable to read base toml")?;
-        if &r != config_str {
+        if r != config_str {
             eprintln!("redoxer: clearing old {}", name);
             fs::remove_file(&base_toml).context("Unable to delete base toml")?;
             fs::remove_file(&base_file).context("Unable to delete base bin/tar")?;
@@ -252,7 +252,7 @@ fn apply_qemu_args(cmd: &mut Command, default: Vec<&str>, args_opt: Option<Vec<&
                 continue; // shouldn't go here
             }
 
-            let is_single_flag = default.get(i + 1).map_or(true, |a| a.starts_with('-'));
+            let is_single_flag = default.get(i + 1).is_none_or(|a| a.starts_with('-'));
 
             if !user_opts.contains(opt) {
                 merged_args.push(opt.to_string());
@@ -357,7 +357,7 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
                 }
                 Command::new("rsync")
                     .arg("--archive")
-                    .arg(&folder)
+                    .arg(folder)
                     .arg(&dst_dir)
                     .status()
                     .and_then(status_error)
@@ -430,7 +430,7 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
         code
     };
 
-    if code == 0 && config.artifacts.len() > 0 {
+    if code == 0 && !config.artifacts.is_empty() {
         let redoxfs_opt = if fuse {
             Some(RedoxFs::new(&redoxer_bin, &dest_dir).context("unable to init redoxfs")?)
         } else {
@@ -442,12 +442,12 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
 
             let dst_dir = Path::new(folder);
             if !dst_dir.is_dir() {
-                fs::create_dir_all(&dst_dir).context("unable to create destination directory")?;
+                fs::create_dir_all(dst_dir).context("unable to create destination directory")?;
             }
             Command::new("rsync")
                 .arg("--archive")
                 .arg(format!("{}/", dest_dir.join(sysroot).display()))
-                .arg(&dst_dir)
+                .arg(dst_dir)
                 .status()
                 .and_then(status_error)
                 .context("rsync failed")?;
@@ -585,7 +585,7 @@ impl RedoxerExecConfig {
         }
 
         if !config.folders.contains_key("root") {
-            if let Some(cmd) = config.arguments.get(0) {
+            if let Some(cmd) = config.arguments.first() {
                 if Path::new(cmd).is_file() {
                     if !cmd.contains('/') {
                         eprintln!(
@@ -599,7 +599,7 @@ impl RedoxerExecConfig {
             }
         }
 
-        if config.artifacts.len() > 0 && !config.fuse {
+        if !config.artifacts.is_empty() && !config.fuse {
             bail!("--artifact requires REDOXER_USE_FUSE=true");
         }
 
@@ -628,7 +628,7 @@ impl RedoxerExecConfig {
             args.push(output.clone());
         }
 
-        if self.arguments.len() > 0 {
+        if !self.arguments.is_empty() {
             args.push("--".to_string());
 
             for arg in &self.arguments {

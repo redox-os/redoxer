@@ -29,10 +29,7 @@ impl RedoxFs {
 
     pub fn mount(&mut self) -> io::Result<()> {
         if self.mounted()? {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "directory was already mounted",
-            ));
+            return Err(io::Error::other("directory was already mounted"));
         }
 
         let (tx, rx) = channel();
@@ -80,10 +77,7 @@ impl RedoxFs {
                 .and_then(status_error)?;
 
             if self.mounted()? {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    "directory was still mounted",
-                ));
+                return Err(io::Error::other("directory was still mounted"));
             }
         }
 
@@ -135,13 +129,13 @@ pub fn run_install_mount(
         skip_partitions: false,
     };
     redox_installer::with_whole_disk(base_bin, &disk_option, move |fs| {
-        redox_installer::with_redoxfs_mount(fs, Some(&base_dir), move |base_dir| {
+        redox_installer::with_redoxfs_mount(fs, Some(base_dir), move |base_dir| {
             if base_tar.exists() {
                 // redoxer in docker was built without FUSE, then CI has FUSE
                 eprintln!("redoxer: extracting archive");
                 extract_tar(base_tar, base_dir)?;
             } else {
-                run_install_to_dir(config, &base_dir)?;
+                run_install_to_dir(config, base_dir)?;
             }
 
             Ok(())
@@ -177,7 +171,7 @@ pub fn archive_image(
 
 pub fn run_install_to_dir(config: redox_installer::Config, base_dir: &Path) -> io::Result<()> {
     redox_installer::install(config, base_dir)
-        .map_err(|err| io::Error::new(io::ErrorKind::Other, format!("{}", err)))?;
+        .map_err(|err| io::Error::other(format!("{}", err)))?;
     Ok(())
 }
 
@@ -210,7 +204,7 @@ pub(crate) fn extract_tar(tar_file: &Path, dest_dir: &Path) -> anyhow::Result<()
         .arg("-p")
         .arg("--same-owner")
         .arg("-f")
-        .arg(&tar_file)
+        .arg(tar_file)
         .arg("-C")
         .arg(dest_dir)
         .arg(".")
@@ -285,7 +279,7 @@ fn open_fs(disk_path: &Path) -> anyhow::Result<FileSystem<DiskFile>> {
 }
 
 fn open_disk(disk_path: &Path) -> anyhow::Result<DiskFile> {
-    let disk = match DiskFile::open(&disk_path) {
+    let disk = match DiskFile::open(disk_path) {
         Ok(disk) => disk,
         Err(err) => {
             bail!(
@@ -356,10 +350,10 @@ fn resize<D: redoxfs::Disk>(fs: &mut FileSystem<D>, shrink: bool) -> Result<(u64
         for index in start..end {
             if shrink {
                 //TODO: replace assert with error?
-                let addr = BlockAddr::new(index as u64, BlockMeta::default());
+                let addr = BlockAddr::new(index, BlockMeta::default());
                 assert_eq!(allocator.allocate_exact(addr), Some(addr));
             } else {
-                let addr = BlockAddr::new(index as u64, BlockMeta::default());
+                let addr = BlockAddr::new(index, BlockMeta::default());
                 allocator.deallocate(addr);
             }
         }
