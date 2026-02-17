@@ -22,10 +22,10 @@ fn download<P: AsRef<Path>>(url: &str, path: P) -> io::Result<()> {
 
 //TODO: Rewrite with hyper or reqwest, tar-rs, sha2, and some gzip crate?
 fn shasum<P: AsRef<Path>>(path: P) -> io::Result<bool> {
-    let parent = path.as_ref().parent().ok_or(io::Error::new(
-        io::ErrorKind::Other,
-        "shasum path had no parent",
-    ))?;
+    let parent = path
+        .as_ref()
+        .parent()
+        .ok_or(io::Error::other("shasum path had no parent"))?;
     Command::new("sha256sum")
         .arg("--check")
         .arg("--ignore-missing")
@@ -70,7 +70,7 @@ fn toolchain_inner(is_update: bool, source_url: String) -> io::Result<PathBuf> {
             download(&format!("{}/relibc-install.tar.gz", url), &prefix_tar)?;
 
             if !shasum(&shasum_file)? {
-                return Err(io::Error::new(io::ErrorKind::Other, "shasum invalid"));
+                return Err(io::Error::other("shasum invalid"));
             }
 
             Command::new("tar")

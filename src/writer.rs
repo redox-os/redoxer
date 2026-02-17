@@ -1,7 +1,7 @@
 use std::{fs, io, path::PathBuf, process};
 
-static INIT_ENV: &'static str = include_str!("../res/20_env");
-static INIT_REDOXER: &'static str = include_str!("../res/29_redoxer");
+static INIT_ENV: &str = include_str!("../res/20_env");
+static INIT_REDOXER: &str = include_str!("../res/29_redoxer");
 
 pub fn write_redoxerd_config(
     dest_dir: &PathBuf,
@@ -13,12 +13,11 @@ pub fn write_redoxerd_config(
         // Replace absolute path to folder with /root in command name
         // TODO: make this activated by a flag
         if let Some(ref folder) = root_dir {
-            let folder_canonical_path = fs::canonicalize(&folder)?;
-            let folder_canonical = folder_canonical_path.to_str().ok_or(io::Error::new(
-                io::ErrorKind::Other,
-                "folder path is not valid UTF-8",
-            ))?;
-            if arg.starts_with(&folder_canonical) {
+            let folder_canonical_path = fs::canonicalize(folder)?;
+            let folder_canonical = folder_canonical_path
+                .to_str()
+                .ok_or(io::Error::other("folder path is not valid UTF-8"))?;
+            if arg.starts_with(folder_canonical) {
                 let arg_replace = arg.replace(folder_canonical, "/root");
                 eprintln!(
                     "redoxer: replacing '{}' with '{}' in arguments",
@@ -30,7 +29,7 @@ pub fn write_redoxerd_config(
             }
         }
 
-        redoxerd_config.push_str(&arg);
+        redoxerd_config.push_str(arg);
         redoxerd_config.push('\n');
     }
     let etc_dir = dest_dir.join("etc");
@@ -101,11 +100,7 @@ impl RedoxerConfig {
 pub fn main(args: &[String]) {
     let config = RedoxerConfig::new(args.iter().cloned().skip(2));
 
-    match write_redoxerd_config(
-        &config.root,
-        &config.arguments,
-        config.folder.as_ref().map(|s| s.as_str()),
-    ) {
+    match write_redoxerd_config(&config.root, &config.arguments, config.folder.as_deref()) {
         Ok(_) => {
             process::exit(0);
         }

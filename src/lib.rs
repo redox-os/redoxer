@@ -13,7 +13,7 @@ mod redoxfs;
 mod toolchain;
 mod writer;
 
-const SUPPORTED_TARGETS: &'static [&'static str] = &[
+const SUPPORTED_TARGETS: &[&str] = &[
     "x86_64-unknown-redox",
     "aarch64-unknown-redox",
     "i586-unknown-redox",
@@ -32,7 +32,7 @@ fn status_error(status: process::ExitStatus) -> io::Result<()> {
     if status.success() {
         Ok(())
     } else {
-        Err(io::Error::new(io::ErrorKind::Other, format!("{}", status)))
+        Err(io::Error::other(format!("{}", status)))
     }
 }
 
@@ -65,12 +65,11 @@ pub fn target() -> &'static str {
         return host_target();
     }
 
-    let index = if SUPPORTED_TARGETS.contains(&&*target_from_env) == true {
+    let index = if SUPPORTED_TARGETS.contains(&&*target_from_env) {
         SUPPORTED_TARGETS
             .iter()
             .position(|t| **t == target_from_env)
             .unwrap()
-            .into()
     } else {
         0usize
     };
