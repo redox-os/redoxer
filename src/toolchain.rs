@@ -1,6 +1,10 @@
+use std::fs::File;
+use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::{env, fs, io};
+
+use sha2::{Digest, Sha256};
 
 use crate::{host_target, redoxer_dir, status_error, target};
 
@@ -20,20 +24,68 @@ fn download<P: AsRef<Path>>(url: &str, path: P) -> io::Result<()> {
         .and_then(status_error)
 }
 
-//TODO: Rewrite with hyper or reqwest, tar-rs, sha2, and some gzip crate?
 fn shasum<P: AsRef<Path>>(path: P) -> io::Result<bool> {
-    let parent = path
-        .as_ref()
-        .parent()
-        .ok_or(io::Error::other("shasum path had no parent"))?;
-    Command::new("sha256sum")
-        .arg("--check")
-        .arg("--ignore-missing")
-        .arg("--quiet")
-        .arg(path.as_ref())
-        .current_dir(parent)
-        .status()
-        .map(|status| status.success())
+    let path = path.as_ref();
+    let Some(parent) = path.parent() else {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            "shasum path had no parent",
+        ));
+    };
+
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+
+    let mut all_match = true;
+    let mut checked_any = false;
+
+    for line in reader.lines() {
+        let line = line?;
+        let line = line.trim();
+
+        if line.len() <= 64 {
+            continue;
+        }
+
+        // "<hash>  <filename>" or "<hash> *<filename>"
+        let (expected_hash, remainder) = line.split_at(64);
+        let filename = remainder.trim_start_matches([' ', '*']);
+        let target_path = parent.join(filename);
+
+        let mut target_file = match File::open(&target_path) {
+            Ok(f) => f,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
+            Err(e) => return Err(e),
+        };
+
+        checked_any = true;
+
+        let mut hasher = Sha256::new();
+        let mut buffer = [0; 8192];
+        loop {
+            let count = target_file.read(&mut buffer)?;
+            if count == 0 {
+                break;
+            }
+            hasher.update(&buffer[..count]);
+        }
+
+        let result = hasher.finalize();
+        let actual_hash = format!("{:x}", result);
+
+        if actual_hash != expected_hash {
+            all_match = false;
+            eprintln!(
+                "sha256sum not match for {:?}:",
+                target_path.file_name().unwrap_or_default().display(),
+            );
+            eprintln!("   actual: {actual_hash}");
+            eprintln!(" expected: {expected_hash}");
+            break;
+        }
+    }
+
+    Ok(all_match && checked_any)
 }
 
 //TODO: Rewrite with hyper or reqwest, tar-rs, sha2, and some gzip crate?

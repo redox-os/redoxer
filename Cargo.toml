@@ -10,9 +10,10 @@ edition = "2018"
 [dependencies]
 anyhow = "^1"
 dirs = "6.0"
+sha2 = "0.10"
 proc-mounts = { version = "0.3", optional = true }
 redox_installer = { version = "0.2", optional = true }
-redox-pkg = { version = "0.2.8", features = ["indicatif"], optional = true }
+redox-pkg = { version = "0.2", features = ["indicatif"], optional = true }
 redox_syscall = { version = "0.7", optional = true }
 redoxfs = { version = "0.9", optional = true }
 tempfile = { version = "3.20", optional = true }
