@@ -1,7 +1,7 @@
 use std::{fs, io, path::PathBuf, process};
 
-static INIT_ENV: &str = include_str!("../res/20_env");
-static INIT_REDOXER: &str = include_str!("../res/29_redoxer");
+static INIT_ENV: &str = include_str!("../res/run_redoxer.ion");
+static INIT_REDOXER: &str = include_str!("../res/30_redoxer");
 
 pub fn write_redoxerd_config(
     dest_dir: &PathBuf,
@@ -38,14 +38,15 @@ pub fn write_redoxerd_config(
     }
     fs::write(etc_dir.join("redoxerd"), redoxerd_config)?;
     let init_dir = dest_dir.join("usr/lib/init.d");
+    let lib_dir = dest_dir.join("usr/lib");
     if !init_dir.is_dir() {
         fs::create_dir_all(&init_dir)?;
     }
-    let init_env_path = init_dir.join("20_env");
+    let init_env_path = lib_dir.join("run_redoxer.ion");
     if !init_env_path.is_file() {
         fs::write(&init_env_path, INIT_ENV)?;
     }
-    let init_redoxer_path = init_dir.join("29_redoxer");
+    let init_redoxer_path = init_dir.join("30_redoxer");
     if !init_redoxer_path.is_file() {
         fs::write(&init_redoxer_path, INIT_REDOXER)?;
     }
