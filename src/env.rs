@@ -173,9 +173,12 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
         let target_flag = if is_host {
             "".to_string()
         } else {
-            let toolchain = toolchain().expect("Should have toolchain init").join(gnu_target());
+            let toolchain = toolchain()
+                .expect("Should have toolchain init")
+                .join(gnu_target());
+            // TODO: define __redox__ in clang
             format!(
-                " --target={} --sysroot={}",
+                " --target={} --sysroot={} -D__redox__",
                 gnu_target(),
                 toolchain.display()
             )
