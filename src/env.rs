@@ -26,7 +26,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     let cargo_target_var = cc_target_var.to_uppercase();
     #[cfg(feature = "cli-pkg")]
     let is_cc = program.as_ref() != "env" && program.as_ref() != "cargo";
-
+    let is_clang = crate::is_use_clang();
     let mut command = process::Command::new(program);
     for (k, v) in gnu_targets.iter() {
         if *k == "CC" || *k == "CXX" {
@@ -44,7 +44,11 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     // CARGO
     command.env(
         format!("CARGO_TARGET_{}_LINKER", cargo_target_var),
-        gnu_targets.get("CC").unwrap(),
+        if is_clang {
+            gnu_targets.get("LD").unwrap()
+        } else {
+            gnu_targets.get("CC").unwrap()
+        },
     );
     command.env("RUSTUP_TOOLCHAIN", &toolchain_dir);
     command.env("TARGET", target);
@@ -169,7 +173,12 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
         let target_flag = if is_host {
             "".to_string()
         } else {
-            format!(" --target={}", gnu_target())
+            let toolchain = toolchain().expect("Should have toolchain init");
+            format!(
+                " --target={} --sysroot={}",
+                gnu_target(),
+                toolchain.display()
+            )
         };
 
         h.insert("AR", "llvm-ar".to_string());
