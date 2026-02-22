@@ -201,11 +201,28 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
             let toolchain = toolchain()
                 .expect("Should have toolchain init")
                 .join(gnu_target());
-            // TODO: define __redox__ in clang
+            // TODO: define __redox__ in clang driver
             format!(
                 " --target={} --sysroot={} -D__redox__",
                 gnu_target(),
                 toolchain.display()
+            )
+        };
+
+        let target_cxxflag = if is_host {
+            "".to_string()
+        } else {
+            let toolchain = toolchain()
+                .expect("Should have toolchain init")
+                .join(gnu_target())
+                .join("include/c++/13.2.0");
+            // TODO: define headers in clang driver
+            // https://discourse.llvm.org/t/40477/11
+            format!(
+                " -I{} -I{} -I{}",
+                toolchain.display(),
+                toolchain.join(gnu_target()).display(),
+                toolchain.join("backward").display()
             )
         };
 
@@ -219,7 +236,7 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
         h.insert("STRIP", "llvm-strip".to_string());
         h.insert("AS", format!("clang{}", target_flag));
         h.insert("CC", format!("clang{}", target_flag));
-        h.insert("CXX", format!("clang++{}", target_flag));
+        h.insert("CXX", format!("clang++{}{}", target_flag, target_cxxflag));
         h.insert("PKG_CONFIG", "pkg-config".to_string());
     }
     if is_host {
