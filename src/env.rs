@@ -45,7 +45,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     command.env(
         format!("CARGO_TARGET_{}_LINKER", cargo_target_var),
         if is_clang {
-            gnu_targets.get("LD").unwrap()
+            "clang"
         } else {
             gnu_targets.get("CC").unwrap()
         },
@@ -63,6 +63,18 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     //      which claims there's no RUSTFLAGS for build.rs
     // 3. There are no CARGO_TARGET_xxx_ENCODED_RUSTFLAGS
     let mut rustflags = env::var("RUSTFLAGS").unwrap_or("".to_string());
+
+    if is_clang && host_target() != target {
+        // add args from cc
+        let cc_args = gnu_targets.get("CC").unwrap().split(' ').skip(1);
+        for arg in cc_args {
+            if !rustflags.is_empty() {
+                rustflags += " ";
+            }
+            rustflags += "-C link-arg=";
+            rustflags += arg;
+        }
+    }
 
     // CPPFLAGS
     let mut cppflags = env::var("CPPFLAGS").unwrap_or_else(|_| "".to_string());
