@@ -98,9 +98,10 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
 
     // LDFLAGS
     let mut ldflags = env::var("LDFLAGS").unwrap_or("".to_string());
-    if is_clang {
-        append_flag(&mut ldflags, "-fuse-ld=lld");
-    }
+    // TODO: https://gitlab.redox-os.org/redox-os/redox/-/issues/1788
+    // if is_clang {
+    //     append_flag(&mut ldflags, "-fuse-ld=lld");
+    // }
 
     #[cfg(feature = "cli-pkg")]
     if let Some(sysroot) = crate::pkg::get_sysroot() {
