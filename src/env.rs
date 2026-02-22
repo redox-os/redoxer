@@ -4,6 +4,22 @@ use anyhow::{anyhow, Context};
 
 use crate::{gnu_target, host_target, status_error, target, toolchain};
 
+fn append_flag(buf: &mut String, flag: &'static str) {
+    if !buf.is_empty() {
+        buf.push(' ');
+    }
+    buf.push_str(flag);
+}
+
+fn append_flag2(buf: &mut String, flag: &'static str, flag2: &str) {
+    if !buf.is_empty() {
+        buf.push(' ');
+    }
+    buf.push_str(flag);
+    // TODO: Quote spaces
+    buf.push_str(flag2);
+}
+
 pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Command> {
     let toolchain_dir = toolchain().context("unable to init toolchain")?;
 
@@ -68,23 +84,22 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
         // add args from cc
         let cc_args = gnu_targets.get("CC").unwrap().split(' ').skip(1);
         for arg in cc_args {
-            if !rustflags.is_empty() {
-                rustflags += " ";
-            }
-            rustflags += "-C link-arg=";
-            rustflags += arg;
+            append_flag2(&mut rustflags, "-C link-arg=", arg);
         }
     }
 
     // CPPFLAGS
     let mut cppflags = env::var("CPPFLAGS").unwrap_or_else(|_| "".to_string());
-    if !cppflags.is_empty() {
-        cppflags += " ";
-    }
     match target {
-        "aarch64-unknown-redox" => cppflags += "-mno-outline-atomics",
-        "riscv64gc-unknown-redox" => cppflags += "-march=rv64gc -mabi=lp64d",
+        "aarch64-unknown-redox" => append_flag(&mut cppflags, "-mno-outline-atomics"),
+        "riscv64gc-unknown-redox" => append_flag(&mut cppflags, "-march=rv64gc -mabi=lp64d"),
         _ => {}
+    }
+
+    // LDFLAGS
+    let mut ldflags = env::var("LDFLAGS").unwrap_or("".to_string());
+    if is_clang {
+        append_flag(&mut ldflags, "-fuse-ld=lld");
     }
 
     #[cfg(feature = "cli-pkg")]
@@ -98,28 +113,22 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
             format!("PKG_CONFIG_SYSROOT_DIR_{}", cc_target_var),
             &sysroot,
         );
-        rustflags = format!(
-            "{} -L native={}",
-            rustflags,
-            sysroot.join("lib").canonicalize()?.display()
-        );
+
+        let libdir = sysroot.join("lib").canonicalize()?;
+        if let Some(libdir) = libdir.to_str() {
+            append_flag(&mut rustflags, "-L");
+            append_flag2(&mut rustflags, "native=", libdir);
+        }
 
         if is_cc {
             let includedir = sysroot.join("include").canonicalize()?;
-            cppflags += &format!(" -I{}", includedir.display());
-
-            let libdir = sysroot.join("lib").canonicalize()?;
-            let mut ldflags = format!(
-                "-Wl,-rpath-link,{} -L{}",
-                libdir.display(),
-                libdir.display()
-            );
-
-            if let Ok(user_ldflags) = env::var("LDFLAGS") {
-                ldflags = format!("{} {}", ldflags, user_ldflags);
+            if let Some(includedir) = includedir.to_str() {
+                append_flag2(&mut cppflags, "-I", includedir);
             }
-
-            command.env("LDFLAGS", ldflags);
+            if let Some(libdir) = libdir.to_str() {
+                append_flag2(&mut ldflags, "-Wl,-rpath-link,", libdir);
+                append_flag2(&mut ldflags, "-L", libdir);
+            }
         }
     }
 
@@ -127,6 +136,9 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
         command.env("CPPFLAGS", &cppflags);
         command.env(format!("CFLAGS_{}", cc_target_var), &cppflags);
         command.env(format!("CXXFLAGS_{}", cc_target_var), &cppflags);
+    }
+    if !ldflags.is_empty() {
+        command.env("LDFLAGS", ldflags);
     }
     if !rustflags.is_empty() {
         command.env(
