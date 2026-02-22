@@ -1,6 +1,5 @@
 use anyhow::{bail, Context};
 use std::collections::{HashMap, HashSet};
-use std::env::VarError;
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::{fs, io};
@@ -10,7 +9,7 @@ use crate::redoxfs::{
     RedoxFs,
 };
 use crate::writer::write_redoxerd_config;
-use crate::{host_target, redoxer_dir, status_error, target};
+use crate::{host_target, parse_bool_env, redoxer_dir, status_error, target};
 
 // extra disk space to fit large projects
 const DISK_SIZE: u64 = 3 * 1024 * 1024 * 1024;
@@ -490,15 +489,6 @@ pub struct RedoxerExecConfig {
 impl RedoxerExecConfig {
     pub fn new(mut args: impl Iterator<Item = String>) -> anyhow::Result<Self> {
         use std::env::var;
-        fn parse_bool_env(name: &str) -> Option<bool> {
-            match var(name).as_deref() {
-                Ok("true" | "1") => Some(true),
-                Ok("false" | "0") => Some(false),
-                Ok(arg) => panic!("invalid argument {} for {}", arg, name),
-                Err(VarError::NotPresent) => None,
-                Err(VarError::NotUnicode(_)) => panic!("non-utf8 argument for {}", name),
-            }
-        }
 
         fn parse_folder(
             map: &mut HashMap<String, String>,

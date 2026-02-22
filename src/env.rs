@@ -26,7 +26,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     let cargo_target_var = cc_target_var.to_uppercase();
     #[cfg(feature = "cli-pkg")]
     let is_cc = program.as_ref() != "env" && program.as_ref() != "cargo";
-
+    let is_clang = crate::is_use_clang();
     let mut command = process::Command::new(program);
     for (k, v) in gnu_targets.iter() {
         if *k == "CC" || *k == "CXX" {
@@ -44,7 +44,11 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     // CARGO
     command.env(
         format!("CARGO_TARGET_{}_LINKER", cargo_target_var),
-        gnu_targets.get("CC").unwrap(),
+        if is_clang {
+            "clang"
+        } else {
+            gnu_targets.get("CC").unwrap()
+        },
     );
     command.env("RUSTUP_TOOLCHAIN", &toolchain_dir);
     command.env("TARGET", target);
@@ -59,6 +63,18 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     //      which claims there's no RUSTFLAGS for build.rs
     // 3. There are no CARGO_TARGET_xxx_ENCODED_RUSTFLAGS
     let mut rustflags = env::var("RUSTFLAGS").unwrap_or("".to_string());
+
+    if is_clang && host_target() != target {
+        // add args from cc
+        let cc_args = gnu_targets.get("CC").unwrap().split(' ').skip(1);
+        for arg in cc_args {
+            if !rustflags.is_empty() {
+                rustflags += " ";
+            }
+            rustflags += "-C link-arg=";
+            rustflags += arg;
+        }
+    }
 
     // CPPFLAGS
     let mut cppflags = env::var("CPPFLAGS").unwrap_or_else(|_| "".to_string());
@@ -124,8 +140,12 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
 }
 
 fn inner<I: Iterator<Item = String>>(program: &str, args: I) -> anyhow::Result<()> {
+    let clang = crate::is_use_clang();
     let program = match program {
         "env" => "env".to_string(),
+        "ar" if clang => "llvm-ar".to_string(),
+        "cc" if clang => "clang".to_string(),
+        "cxx" if clang => "clang++".to_string(),
         "ar" => format!("{}-ar", gnu_target()),
         "cc" => format!("{}-gcc", gnu_target()),
         "cxx" => format!("{}-g++", gnu_target()),
@@ -141,25 +161,54 @@ fn inner<I: Iterator<Item = String>>(program: &str, args: I) -> anyhow::Result<(
 
 fn generate_gnu_targets() -> HashMap<&'static str, String> {
     let is_host = host_target() == target();
-    let target_prefix = if is_host {
-        "".to_string()
-    } else {
-        format!("{}-", gnu_target())
-    };
     let mut h = HashMap::new();
-    h.insert("AR", format!("{}gcc-ar", target_prefix));
-    h.insert("AS", format!("{}as", target_prefix));
-    h.insert("CC", format!("{}gcc", target_prefix));
-    h.insert("CXX", format!("{}g++", target_prefix));
-    h.insert("LD", format!("{}ld", target_prefix));
-    h.insert("NM", format!("{}gcc-nm", target_prefix));
-    h.insert("OBJCOPY", format!("{}objcopy", target_prefix));
-    h.insert("OBJDUMP", format!("{}objdump", target_prefix));
-    h.insert("PKG_CONFIG", format!("{}pkg-config", target_prefix));
-    h.insert("RANLIB", format!("{}gcc-ranlib", target_prefix));
-    h.insert("READELF", format!("{}readelf", target_prefix));
-    h.insert("STRIP", format!("{}strip", target_prefix));
+    if !crate::is_use_clang() {
+        let target_prefix = if is_host {
+            "".to_string()
+        } else {
+            format!("{}-", gnu_target())
+        };
 
+        h.insert("AR", format!("{}gcc-ar", target_prefix));
+        h.insert("AS", format!("{}as", target_prefix));
+        h.insert("CC", format!("{}gcc", target_prefix));
+        h.insert("CXX", format!("{}g++", target_prefix));
+        h.insert("LD", format!("{}ld", target_prefix));
+        h.insert("NM", format!("{}gcc-nm", target_prefix));
+        h.insert("OBJCOPY", format!("{}objcopy", target_prefix));
+        h.insert("OBJDUMP", format!("{}objdump", target_prefix));
+        h.insert("PKG_CONFIG", format!("{}pkg-config", target_prefix));
+        h.insert("RANLIB", format!("{}gcc-ranlib", target_prefix));
+        h.insert("READELF", format!("{}readelf", target_prefix));
+        h.insert("STRIP", format!("{}strip", target_prefix));
+    } else {
+        let target_flag = if is_host {
+            "".to_string()
+        } else {
+            let toolchain = toolchain()
+                .expect("Should have toolchain init")
+                .join(gnu_target());
+            // TODO: define __redox__ in clang
+            format!(
+                " --target={} --sysroot={} -D__redox__",
+                gnu_target(),
+                toolchain.display()
+            )
+        };
+
+        h.insert("AR", "llvm-ar".to_string());
+        h.insert("LD", "ld.lld".to_string());
+        h.insert("NM", "llvm-nm".to_string());
+        h.insert("OBJCOPY", "llvm-objcopy".to_string());
+        h.insert("OBJDUMP", "llvm-objdump".to_string());
+        h.insert("RANLIB", "llvm-ranlib".to_string());
+        h.insert("READELF", "llvm-readelf".to_string());
+        h.insert("STRIP", "llvm-strip".to_string());
+        h.insert("AS", format!("clang{}", target_flag));
+        h.insert("CC", format!("clang{}", target_flag));
+        h.insert("CXX", format!("clang++{}", target_flag));
+        h.insert("PKG_CONFIG", "pkg-config".to_string());
+    }
     if is_host {
         for (k, v) in h.iter_mut() {
             if let Ok(env) = std::env::var(format!("REDOXER_HOST_{}", k)) {
