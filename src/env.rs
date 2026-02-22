@@ -124,8 +124,12 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
 }
 
 fn inner<I: Iterator<Item = String>>(program: &str, args: I) -> anyhow::Result<()> {
+    let clang = crate::is_use_clang();
     let program = match program {
         "env" => "env".to_string(),
+        "ar" if clang => "llvm-ar".to_string(),
+        "cc" if clang => "clang".to_string(),
+        "cxx" if clang => "clang++".to_string(),
         "ar" => format!("{}-ar", gnu_target()),
         "cc" => format!("{}-gcc", gnu_target()),
         "cxx" => format!("{}-g++", gnu_target()),
@@ -141,25 +145,46 @@ fn inner<I: Iterator<Item = String>>(program: &str, args: I) -> anyhow::Result<(
 
 fn generate_gnu_targets() -> HashMap<&'static str, String> {
     let is_host = host_target() == target();
-    let target_prefix = if is_host {
-        "".to_string()
-    } else {
-        format!("{}-", gnu_target())
-    };
     let mut h = HashMap::new();
-    h.insert("AR", format!("{}gcc-ar", target_prefix));
-    h.insert("AS", format!("{}as", target_prefix));
-    h.insert("CC", format!("{}gcc", target_prefix));
-    h.insert("CXX", format!("{}g++", target_prefix));
-    h.insert("LD", format!("{}ld", target_prefix));
-    h.insert("NM", format!("{}gcc-nm", target_prefix));
-    h.insert("OBJCOPY", format!("{}objcopy", target_prefix));
-    h.insert("OBJDUMP", format!("{}objdump", target_prefix));
-    h.insert("PKG_CONFIG", format!("{}pkg-config", target_prefix));
-    h.insert("RANLIB", format!("{}gcc-ranlib", target_prefix));
-    h.insert("READELF", format!("{}readelf", target_prefix));
-    h.insert("STRIP", format!("{}strip", target_prefix));
+    if !crate::is_use_clang() {
+        let target_prefix = if is_host {
+            "".to_string()
+        } else {
+            format!("{}-", gnu_target())
+        };
 
+        h.insert("AR", format!("{}gcc-ar", target_prefix));
+        h.insert("AS", format!("{}as", target_prefix));
+        h.insert("CC", format!("{}gcc", target_prefix));
+        h.insert("CXX", format!("{}g++", target_prefix));
+        h.insert("LD", format!("{}ld", target_prefix));
+        h.insert("NM", format!("{}gcc-nm", target_prefix));
+        h.insert("OBJCOPY", format!("{}objcopy", target_prefix));
+        h.insert("OBJDUMP", format!("{}objdump", target_prefix));
+        h.insert("PKG_CONFIG", format!("{}pkg-config", target_prefix));
+        h.insert("RANLIB", format!("{}gcc-ranlib", target_prefix));
+        h.insert("READELF", format!("{}readelf", target_prefix));
+        h.insert("STRIP", format!("{}strip", target_prefix));
+    } else {
+        let target_flag = if is_host {
+            "".to_string()
+        } else {
+            format!(" --target={}", gnu_target())
+        };
+
+        h.insert("AR", "llvm-ar".to_string());
+        h.insert("LD", "ld.lld".to_string());
+        h.insert("NM", "llvm-nm".to_string());
+        h.insert("OBJCOPY", "llvm-objcopy".to_string());
+        h.insert("OBJDUMP", "llvm-objdump".to_string());
+        h.insert("RANLIB", "llvm-ranlib".to_string());
+        h.insert("READELF", "llvm-readelf".to_string());
+        h.insert("STRIP", "llvm-strip".to_string());
+        h.insert("AS", format!("clang{}", target_flag));
+        h.insert("CC", format!("clang{}", target_flag));
+        h.insert("CXX", format!("clang++{}", target_flag));
+        h.insert("PKG_CONFIG", "pkg-config".to_string());
+    }
     if is_host {
         for (k, v) in h.iter_mut() {
             if let Ok(env) = std::env::var(format!("REDOXER_HOST_{}", k)) {
