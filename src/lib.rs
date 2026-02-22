@@ -1,4 +1,4 @@
-use std::{io, path, process};
+use std::{env::VarError, io, path, process};
 
 pub(crate) use self::toolchain::toolchain;
 
@@ -125,6 +125,20 @@ pub fn host_target() -> &'static str {
         ("x86_64", "freebsd") => "x86_64-unknown-freebsd",
         ("aarch64", "freebsd") => "aarch64-unknown-freebsd",
         _ => panic!("Unsupported host OS/ARCH!"),
+    }
+}
+
+pub fn is_use_clang() -> bool {
+    parse_bool_env("REDOXER_USE_CLANG").unwrap_or(false)
+}
+
+pub(crate) fn parse_bool_env(name: &str) -> Option<bool> {
+    match std::env::var(name).as_deref() {
+        Ok("true" | "1") => Some(true),
+        Ok("false" | "0") => Some(false),
+        Ok(arg) => panic!("invalid argument {} for {}", arg, name),
+        Err(VarError::NotPresent) => None,
+        Err(VarError::NotUnicode(_)) => panic!("non-utf8 argument for {}", name),
     }
 }
 
