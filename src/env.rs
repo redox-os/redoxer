@@ -4,6 +4,14 @@ use anyhow::{anyhow, Context};
 
 use crate::{gnu_target, host_target, status_error, target, toolchain};
 
+fn target_is_64bit(target: &'static str) -> bool {
+    match &target[0..4] {
+        "i586" => false,
+        "i686" => false,
+        _ => true,
+    }
+}
+
 fn append_flag(buf: &mut String, flag: &'static str) {
     if !buf.is_empty() {
         buf.push(' ');
@@ -79,6 +87,9 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     //      which claims there's no RUSTFLAGS for build.rs
     // 3. There are no CARGO_TARGET_xxx_ENCODED_RUSTFLAGS
     let mut rustflags = env::var("RUSTFLAGS").unwrap_or("".to_string());
+    if target_is_64bit(target) {
+        append_flag(&mut rustflags, "-C force-frame-pointers=yes");
+    }
 
     if is_clang && host_target() != target {
         // add args from cc
