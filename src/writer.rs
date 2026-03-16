@@ -1,11 +1,15 @@
-use std::{fs, io, path::PathBuf, process};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+    process,
+};
 
 static INIT_ENV: &str = include_str!("../res/run_redoxer.ion");
 static INIT_REDOXER: &str = include_str!("../res/30_redoxer");
 
 pub fn write_redoxerd_config(
-    dest_dir: &PathBuf,
-    arguments: &Vec<String>,
+    dest_dir: &Path,
+    arguments: &[String],
     root_dir: Option<&str>,
 ) -> Result<(), io::Error> {
     let mut redoxerd_config = String::new();
@@ -99,7 +103,7 @@ impl RedoxerConfig {
 }
 
 pub fn main(args: &[String]) {
-    let config = RedoxerConfig::new(args.iter().cloned().skip(2));
+    let config = RedoxerConfig::new(args.iter().skip(2).cloned());
 
     match write_redoxerd_config(&config.root, &config.arguments, config.folder.as_deref()) {
         Ok(_) => {

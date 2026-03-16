@@ -27,10 +27,7 @@ fn download<P: AsRef<Path>>(url: &str, path: P) -> io::Result<()> {
 fn shasum<P: AsRef<Path>>(path: P) -> io::Result<bool> {
     let path = path.as_ref();
     let Some(parent) = path.parent() else {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            "shasum path had no parent",
-        ));
+        return Err(io::Error::other("shasum path had no parent"));
     };
 
     let file = File::open(path)?;
@@ -162,7 +159,7 @@ pub fn toolchain() -> io::Result<PathBuf> {
 pub fn main(args: &[String]) {
     let mut is_update = false;
     let mut source_url: String = String::from(DEFAULT_TOOLCHAIN_SOURCE);
-    let args: Vec<String> = args.iter().cloned().skip(2).collect();
+    let args: Vec<String> = args.iter().skip(2).cloned().collect();
 
     let mut i = 0;
     while i < args.len() {

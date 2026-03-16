@@ -58,7 +58,7 @@ fn pkg_inner(
 }
 
 pub fn main(args: &[String]) {
-    let args: Vec<String> = args.iter().cloned().skip(2).collect();
+    let args: Vec<String> = args.iter().skip(2).cloned().collect();
 
     let mut i = 0;
     let mut pkgs = Vec::new();

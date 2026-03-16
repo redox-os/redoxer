@@ -5,11 +5,7 @@ use anyhow::{anyhow, Context};
 use crate::{gnu_target, host_target, status_error, target, toolchain};
 
 fn target_is_64bit(target: &'static str) -> bool {
-    match &target[0..4] {
-        "i586" => false,
-        "i686" => false,
-        _ => true,
-    }
+    !matches!(&target[0..4], "i586" | "i686")
 }
 
 fn append_flag(buf: &mut String, flag: &'static str) {
@@ -263,7 +259,7 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
 }
 
 pub fn main(args: &[String]) {
-    match inner(args.get(1).unwrap(), args.iter().cloned().skip(2)) {
+    match inner(args.get(1).unwrap(), args.iter().skip(2).cloned()) {
         Ok(()) => {
             process::exit(0);
         }
