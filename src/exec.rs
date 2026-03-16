@@ -631,7 +631,7 @@ impl RedoxerExecConfig {
 }
 
 pub fn main(args: &[String]) {
-    let config = match RedoxerExecConfig::new(args.iter().cloned().skip(2)) {
+    let config = match RedoxerExecConfig::new(args.iter().skip(2).cloned()) {
         Ok(config) => config,
         Err(err) => {
             eprintln!("{:?}", err);
