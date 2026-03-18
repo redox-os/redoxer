@@ -1,4 +1,4 @@
-use pkg::{callback::IndicatifCallback, Library, PackageName};
+use pkg::{backend::Error, callback::IndicatifCallback, Library, PackageName};
 use std::{
     cell::RefCell,
     env, fs, io,
@@ -48,7 +48,7 @@ fn pkg_inner(
 
     library
         .apply()
-        .map_err(|e: pkg::Error| {
+        .map_err(|e: Error| {
             eprintln!("Unable to complete pkg action: {e}");
             process::exit(1);
         })
