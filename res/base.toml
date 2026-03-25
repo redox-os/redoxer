@@ -64,7 +64,20 @@ postinstall = false
 [[files]]
 path = "/usr/lib/init.d/00_drivers"
 data = """
+requires_weak 00_base
 pcid-spawner
+"""
+symlink = false
+directory = false
+recursive_chown = false
+postinstall = false
+
+[[files]]
+path = "/usr/lib/init.d/10_net"
+data = """
+requires_weak 00_drivers
+notify smolnetd
+nowait dhcpd
 """
 symlink = false
 directory = false
@@ -122,6 +135,46 @@ postinstall = false
 [[files]]
 path = "/etc/hostname"
 data = "redox"
+symlink = false
+directory = false
+recursive_chown = false
+postinstall = false
+
+[[files]]
+path = "/etc/net/dns"
+data = """
+9.9.9.9
+"""
+symlink = false
+directory = false
+recursive_chown = false
+postinstall = false
+
+[[files]]
+path = "/etc/net/ip"
+data = """
+10.0.2.15
+"""
+symlink = false
+directory = false
+recursive_chown = false
+postinstall = false
+
+[[files]]
+path = "/etc/net/ip_router"
+data = """
+10.0.2.2
+"""
+symlink = false
+directory = false
+recursive_chown = false
+postinstall = false
+
+[[files]]
+path = "/etc/net/ip_subnet"
+data = """
+255.255.255.0
+"""
 symlink = false
 directory = false
 recursive_chown = false
@@ -401,57 +454,7 @@ postinstall = false
 [[files]]
 path = "/usr/lib/init.d/10_net"
 data = """
-notify smolnetd
-nowait dhcpd
-"""
-symlink = false
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/etc/net/dns"
-data = """
-9.9.9.9
-"""
-symlink = false
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/etc/net/ip"
-data = """
-10.0.2.15
-"""
-symlink = false
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/etc/net/ip_router"
-data = """
-10.0.2.2
-"""
-symlink = false
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/etc/net/ip_subnet"
-data = """
-255.255.255.0
-"""
-symlink = false
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/usr/lib/init.d/10_net"
-data = """
+requires_weak 00_drivers
 notify smolnetd
 dhcpd
 """
@@ -463,6 +466,7 @@ postinstall = false
 [[files]]
 path = "/usr/lib/init.d/30_redoxer"
 data = """
+requires_weak 10_net
 ion /usr/lib/run_redoxer.ion
 """
 symlink = false
@@ -497,8 +501,6 @@ postinstall = false
 password = "password"
 uid = 0
 gid = 0
-name = "root"
-home = "/root"
 shell = "/usr/bin/ion"
 
 [users.user]
