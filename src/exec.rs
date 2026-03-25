@@ -143,9 +143,9 @@ fn bootloader() -> anyhow::Result<PathBuf> {
 
         fs::rename(
             bootloader_dir.join(if qemu_use_uefi() {
-                "boot/bootloader-live.efi"
+                "usr/lib/boot/bootloader-live.efi"
             } else {
-                "boot/bootloader.bios"
+                "usr/lib/boot/bootloader.bios"
             }),
             &bootloader_bin,
         )?;
