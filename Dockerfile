@@ -25,7 +25,7 @@ ENV PATH=/root/.cargo/bin:$PATH
 
 # Install redoxer
 COPY . /root/redoxer
-RUN cargo install --path /root/redoxer && \
+RUN cargo install --path /root/redoxer --locked && \
     rm -rf /root/redoxer /root/.cargo/git /root/.cargo/registry 
 
 # Install redoxer toolchain
