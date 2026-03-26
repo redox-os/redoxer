@@ -47,7 +47,7 @@ redoxer toolchain [--update] [--url PATH]
 - Install the tool
 
 ```sh
-cargo install redoxer
+cargo install redoxer --locked
 ```
 
 - Install the Redox toolchain
