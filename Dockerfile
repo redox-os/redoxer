@@ -22,14 +22,20 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
 
 # Set path
 ENV PATH=/root/.cargo/bin:$PATH
+ENV TARGET=x86_64-unknown-redox
 
 # Install redoxer
 COPY . /root/redoxer
-RUN cargo install --path /root/redoxer --locked && \
-    rm -rf /root/redoxer /root/.cargo/git /root/.cargo/registry 
+RUN cargo install --path /root/redoxer --locked
 
 # Install redoxer toolchain
-RUN TARGET=x86_64-unknown-redox redoxer toolchain
+RUN redoxer toolchain
 
 # Ensure redoxer exec is working
 RUN redoxer exec true
+
+# Ensure redoxer test is working
+RUN cd /root/redoxer/example && redoxer test
+
+# Strip unneeded files
+RUN rm -rf /root/redoxer /root/.cargo/git /root/.cargo/registry 

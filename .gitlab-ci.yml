@@ -31,6 +31,7 @@ exec-test:
   script:
     - cargo install --path . --locked
     - redoxer exec true
+    - cd example && redoxer test
 
 uefi-test:
   image: "redoxos/redoxer:aarch64"
@@ -38,3 +39,4 @@ uefi-test:
   script:
     - cargo install --path . --locked
     - redoxer exec true
+    - cd example && redoxer test
