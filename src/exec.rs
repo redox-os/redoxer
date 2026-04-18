@@ -69,8 +69,8 @@ pub fn qemu_disk_size() -> u64 {
     }
 }
 
+#[rustfmt::skip]
 pub fn qemu_default_args() -> Vec<&'static str> {
-    #[rustfmt::skip]
     let mut default_args = vec![
         "-cpu", "max",
         "-m", "2048",
@@ -79,14 +79,12 @@ pub fn qemu_default_args() -> Vec<&'static str> {
         "-device", "e1000,netdev=net0",
     ];
     default_args.extend(match target() {
-        #[rustfmt::skip]
         "i586-unknown-redox" | "i686-unknown-redox" | "x86_64-unknown-redox" => vec![
             "-machine", "q35", 
             "-serial", "mon:stdio",
             "-device", "isa-debugcon,chardev=log",
             "-device", "isa-debug-exit",
         ],
-        #[rustfmt::skip]
         "aarch64-unknown-redox" => {
             let (bios_arg, bios_file) = if Path::new("/usr/share/AAVMF/AAVMF_CODE.fd").exists() {
                 ("-bios", "/usr/share/AAVMF/AAVMF_CODE.fd")
@@ -104,7 +102,6 @@ pub fn qemu_default_args() -> Vec<&'static str> {
                 "-semihosting-config", "enable=on,target=native,userspace=on"
             ]
         }
-        #[rustfmt::skip]
         "riscv64gc-unknown-redox" => vec![
             "-machine", "virt",
             // TODO: Add more devices
@@ -208,7 +205,10 @@ fn base(
             // only shrink disk outside CI
             if !base_tar.exists() {
                 eprintln!("redoxer: shrinking {}", name);
-                shrink_disk(&base_partial)?;
+                // TODO: The bootloader unable to boot
+                if !qemu_use_uefi() {
+                    shrink_disk(&base_partial)?;
+                }
             }
         } else {
             run_install_to_dir(config, &base_dir)?;
