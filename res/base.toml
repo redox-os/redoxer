@@ -7,8 +7,6 @@ prompt = false
 
 [packages.base]
 
-[packages.base-initfs]
-
 [packages.bash]
 
 [packages.bootloader]
@@ -44,45 +42,6 @@ prompt = false
 [packages.userutils]
 
 [packages.uutils]
-
-[[files]]
-path = "/usr/lib/init.d/00_base"
-data = """
-# clear and recreate tmpdir with 0o1777 permission
-rm -rf /tmp
-mkdir -m a=rwxt /tmp
-
-notify ipcd
-notify ptyd
-nowait sudo --daemon
-"""
-symlink = false
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/usr/lib/init.d/00_drivers"
-data = """
-requires_weak 00_base
-pcid-spawner
-"""
-symlink = false
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/usr/lib/init.d/10_net"
-data = """
-requires_weak 00_drivers
-notify smolnetd
-nowait dhcpd
-"""
-symlink = false
-directory = false
-recursive_chown = false
-postinstall = false
 
 [[files]]
 path = "/etc/login_schemes.toml"
@@ -388,75 +347,17 @@ recursive_chown = false
 postinstall = false
 
 [[files]]
-path = "/dev/null"
-data = "/scheme/null"
-symlink = true
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/dev/random"
-data = "/scheme/rand"
-symlink = true
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/dev/urandom"
-data = "/scheme/rand"
-symlink = true
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/dev/zero"
-data = "/scheme/zero"
-symlink = true
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/dev/tty"
-data = "libc:tty"
-symlink = true
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/dev/stdin"
-data = "libc:stdin"
-symlink = true
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/dev/stdout"
-data = "libc:stdout"
-symlink = true
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/dev/stderr"
-data = "libc:stderr"
-symlink = true
-directory = false
-recursive_chown = false
-postinstall = false
-
-[[files]]
-path = "/usr/lib/init.d/10_net"
+path = "/usr/lib/init.d/10_dhcpd.service"
 data = """
-requires_weak 00_drivers
-notify smolnetd
-dhcpd
+[unit]
+description = "Network configuration using DHCP"
+requires_weak = [
+    "10_smolnetd.service",
+]
+
+[service]
+cmd = "dhcpd"
+type = "oneshot"
 """
 symlink = false
 directory = false
@@ -466,7 +367,7 @@ postinstall = false
 [[files]]
 path = "/usr/lib/init.d/30_redoxer"
 data = """
-requires_weak 10_net
+requires_weak 10_net.target
 ion /usr/lib/run_redoxer.ion
 """
 symlink = false
