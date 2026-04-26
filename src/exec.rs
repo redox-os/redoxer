@@ -1,7 +1,7 @@
 use anyhow::{bail, Context};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::process::{self, Command};
+use std::process::{self, Command, Stdio};
 use std::{fs, io};
 
 use crate::redoxfs::{
@@ -403,6 +403,11 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
             config.qemu_args.as_ref().map(|s| s.split(" ").collect()),
         );
 
+        if config.output.as_ref().is_some_and(|s| s == "-") {
+            command.stdout(Stdio::null());
+            command.stderr(Stdio::null());
+        }
+
         if qemu_verbose {
             eprintln!("{:?}", command);
         }
@@ -420,12 +425,14 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
                 1
             }
             _ => {
-                eprintln!("## redoxer (failure, qemu exit status {:?} ##", status);
+                eprintln!("## redoxer (failure, qemu exit status {}) ##", status);
                 2
             }
         };
 
-        if let Some(output) = &config.output {
+        if let Some(output) = &config.output
+            && output != "-"
+        {
             fs::copy(&redoxer_log, output)?;
         } else {
             print!("{}", fs::read_to_string(&redoxer_log)?);

@@ -54,6 +54,8 @@ fn usage() {
     eprintln!("redoxer test - cargo test with Redox target in Redox VM");
     eprintln!("redoxer write-exec - write redoxer exec test configuration");
     eprintln!("redoxer toolchain - install toolchain");
+    eprintln!("");
+    eprintln!("Visit https://crates.io/crates/redox_installer for more help");
     process::exit(1);
 }
 

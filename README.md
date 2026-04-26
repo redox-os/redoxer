@@ -2,7 +2,7 @@
 
 The tool used to build/run Rust programs (and C/C++ programs with zero dependencies) inside of a Redox VM, the Redox GitLab CI use a Docker image with `redoxer` pre-installed.
 
-A pre-built Docker image can be found on [Docker Hub](https://hub.docker.com/r/redoxos/redoxer)
+A pre-built Docker image can be found on [Docker Hub](https://hub.docker.com/r/redoxos/redoxer). Visit [the book for Continous Integration](https://doc.redox-os.org/book/ci.html) for more information.
 
 ## Options
 
@@ -29,6 +29,9 @@ redoxer exec [-f|--folder folder] [-f|--folder folder:/path/in/redox] [-g|--gui]
         REDOXER_QEMU_BINARY   Override qemu binary
         REDOXER_QEMU_ARGS     Override qemu args
         REDOXER_USE_FUSE      [true|false] Override use fuse (default is automatically detected)
+    Notes:
+    - Setting REDOXER_QEMU_BINARY will print qemu commands to terminal
+    - Setting "-o -" will hide qemu serial output, only printing stdout/stderr from the command
 
 redoxer pkg [install|remove|update] pkg-1 pkg-2 ...
     Install additional native packages for Cargo
