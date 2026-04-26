@@ -5,7 +5,7 @@ description = "Method for quickly running programs inside of Redox from a KVM ca
 license = "MIT"
 authors = ["Jeremy Soller <jackpot51@gmail.com>"]
 repository = "https://gitlab.redox-os.org/redox-os/redoxer"
-edition = "2018"
+edition = "2024"
 
 [dependencies]
 anyhow = "1"
