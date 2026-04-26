@@ -282,6 +282,8 @@ fn installed(program: &str) -> io::Result<bool> {
 
 fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
     let qemu_binary = config.qemu_binary.as_deref().unwrap_or(qemu_executable());
+    // it is unusual to request custom qemu binary
+    let qemu_verbose = config.qemu_binary.is_some();
 
     if !installed(qemu_binary)? {
         eprintln!(
@@ -401,6 +403,9 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
             config.qemu_args.as_ref().map(|s| s.split(" ").collect()),
         );
 
+        if qemu_verbose {
+            eprintln!("{:?}", command);
+        }
         let status = command.status().context("unable to get redoxer status")?;
 
         eprintln!();
