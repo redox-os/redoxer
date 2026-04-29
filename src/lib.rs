@@ -19,6 +19,8 @@ const SUPPORTED_TARGETS: &[&str] = &[
     "i586-unknown-redox",
     "i686-unknown-redox",
     "riscv64gc-unknown-redox",
+    "x86_64-unknown-linux-relibc",
+    "aarch64-unknown-linux-relibc",
 ];
 
 fn redoxer_dir() -> path::PathBuf {
@@ -86,6 +88,8 @@ pub fn gnu_target() -> &'static str {
         "x86_64-unknown-linux-gnu" => "x86_64-linux-gnu",
         "aarch64-unknown-linux-musl" => "aarch64-linux-musl",
         "x86_64-unknown-linux-musl" => "x86_64-linux-musl",
+        "aarch64-unknown-linux-relibc" => "aarch64-linux-relibc",
+        "x86_64-unknown-linux-relibc" => "x86_64-linux-relibc",
         rust_target => rust_target,
     }
 }
