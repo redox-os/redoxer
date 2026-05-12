@@ -21,7 +21,11 @@ pub fn qemu_executable() -> &'static str {
         "x86_64-unknown-redox" => "qemu-system-x86_64",
         "aarch64-unknown-redox" => "qemu-system-aarch64",
         "i586-unknown-redox" | "i686-unknown-redox" => "qemu-system-i386",
-        "riscv64gc-unknown-redox" => "qemu-system-riscv64",
+        // "riscv64gc-unknown-redox" => "qemu-system-riscv64",
+        "riscv64gc-unknown-redox" => todo!(
+            "RISC-V does not have a working driver to report test result.\n\
+        If you insist to, try again with `export REDOXER_QEMU_BINARY=qemu-system-riscv64`"
+        ),
         _ => panic!("Unknown target architecture for QEMU"),
     }
 }
@@ -86,27 +90,39 @@ pub fn qemu_default_args() -> Vec<&'static str> {
             "-device", "isa-debug-exit",
         ],
         "aarch64-unknown-redox" => {
-            let (bios_arg, bios_file) = if Path::new("/usr/share/AAVMF/AAVMF_CODE.fd").exists() {
+            let (efi_arg, efi_file) = if Path::new("/usr/share/AAVMF/AAVMF_CODE.fd").exists() {
                 ("-bios", "/usr/share/AAVMF/AAVMF_CODE.fd")
             } else if Path::new("/usr/share/qemu/edk2-aarch64-code.fd").exists() {
                 ("-drive", "if=pflash,format=raw,unit=0,file=/usr/share/qemu/edk2-aarch64-code.fd,readonly=on")
             } else {
-                todo!("Can't figure out where is the BIOS file!")
+                todo!("Can't figure out where is the EFI file!")
             };
             vec![
                 "-machine", "virt",
                 "-serial", "chardev:debug",
                 "-mon", "chardev=debug",
-                bios_arg, bios_file,
+                efi_arg, efi_file,
                 "-chardev", "stdio,id=debug,signal=off,mux=on",
                 "-semihosting-config", "enable=on,target=native,userspace=on"
             ]
         }
-        "riscv64gc-unknown-redox" => vec![
-            "-machine", "virt",
-            // TODO: Add more devices
-            "-semihosting-config", "enable=on,target=native,userspace=on"
-        ],
+        "riscv64gc-unknown-redox" => {
+            let (efi_arg, efi_file) = if Path::new("/usr/share/qemu-efi-riscv64/RISCV_VIRT_CODE.fd").exists() {
+                ("-bios", "/usr/share/qemu-efi-riscv64/RISCV_VIRT_CODE.fd")
+            } else if Path::new("/usr/share/qemu/edk2-riscv-code.fd").exists() {
+                ("-drive", "if=pflash,format=raw,unit=0,file=/usr/share/qemu/edk2-riscv-code.fd,readonly=on")
+            } else {
+                todo!("Can't figure out where is the EFI file!")
+            };
+            vec![
+                "-machine", "virt",
+                "-serial", "chardev:debug",
+                "-mon", "chardev=debug",
+                efi_arg, efi_file,
+                "-chardev", "stdio,id=debug,signal=off,mux=on",
+                "-semihosting-config", "enable=on,target=native,userspace=on"
+            ]
+        },
         _ => panic!("Unknown target architecture for QEMU"),
     });
     default_args
@@ -281,7 +297,10 @@ fn installed(program: &str) -> io::Result<bool> {
 }
 
 fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
-    let qemu_binary = config.qemu_binary.as_deref().unwrap_or(qemu_executable());
+    let qemu_binary = config
+        .qemu_binary
+        .as_deref()
+        .unwrap_or_else(|| qemu_executable());
     // it is unusual to request custom qemu binary
     let qemu_verbose = config.qemu_binary.is_some();
 
@@ -430,7 +449,7 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
             }
         };
 
-        match (config.output.as_ref().map(|s| s.as_str())) {
+        match config.output.as_ref().map(|s| s.as_str()) {
             Some("-") => print!("{}", fs::read_to_string(&redoxer_log)?),
             Some(output) => fs::copy(&redoxer_log, output).map(|_| {})?,
             None => {}
