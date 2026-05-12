@@ -430,7 +430,7 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
             }
         };
 
-        match (config.output.as_ref().map(|s| s.as_str())) {
+        match config.output.as_ref().map(|s| s.as_str()) {
             Some("-") => print!("{}", fs::read_to_string(&redoxer_log)?),
             Some(output) => fs::copy(&redoxer_log, output).map(|_| {})?,
             None => {}

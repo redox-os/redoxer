@@ -103,7 +103,7 @@ fn toolchain_inner(is_update: bool, source_url: String) -> io::Result<PathBuf> {
         fs::remove_dir_all(&toolchain_dir)?;
     }
     if !toolchain_dir.is_dir() {
-        println!("redoxer: building toolchain");
+        println!("redoxer: building toolchain from {source_url:?}");
 
         let toolchain_partial = redoxer_dir().join("toolchain.partial");
         if toolchain_partial.is_dir() {
@@ -115,28 +115,11 @@ fn toolchain_inner(is_update: bool, source_url: String) -> io::Result<PathBuf> {
             let shasum_file = toolchain_partial.join("SHA256SUM");
             download(&format!("{}/SHA256SUM", url), &shasum_file)?;
 
-            let mut retried = false;
-
             let prefix_tar = toolchain_partial.join("relibc-install.tar.gz");
-            loop {
-                download(&format!("{}/relibc-install.tar.gz", url), &prefix_tar)?;
+            download(&format!("{}/relibc-install.tar.gz", url), &prefix_tar)?;
 
-                if !shasum(&shasum_file)? {
-                    if !retried {
-                        // Cloudflare cut this connection when hitting 512MB limit then retries with "no cache mode"
-                        // The fact that curl exit error is 0 makes us have to use this loop
-                        println!("redoxer: toolchain shasum invalid, could be caused by CDN failures, retrying");
-                        if prefix_tar.is_file() {
-                            // The server doesn't support http ranges, so download must start from stratch
-                            fs::remove_file(&prefix_tar)?;
-                        }
-                        retried = true;
-                        continue;
-                    } else {
-                        return Err(io::Error::other("shasum invalid"));
-                    }
-                }
-                break;
+            if !shasum(&shasum_file)? {
+                return Err(io::Error::other("shasum invalid"));
             }
 
             Command::new("tar")
