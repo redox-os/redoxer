@@ -44,8 +44,6 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     let gnu_targets = generate_gnu_targets();
     let cc_target_var = target.replace("-", "_");
     let cargo_target_var = cc_target_var.to_uppercase();
-    #[cfg(feature = "cli-pkg")]
-    let is_cc = program.as_ref() != "env" && program.as_ref() != "cargo";
     let is_clang = crate::is_use_clang();
     let mut command = process::Command::new(program);
     for (k, v) in gnu_targets.iter() {
@@ -121,22 +119,24 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
             format!("PKG_CONFIG_SYSROOT_DIR_{}", cc_target_var),
             &sysroot,
         );
+        // we've set `PKG_CONFIG_PATH` and prefixed pkg-config isn't available
+        command.env("PKG_CONFIG", "pkg-config");
+        command.env(format!("PKG_CONFIG_{cc_target_var}"), "pkg-config");
 
         let libdir = sysroot.join("lib").canonicalize()?;
         if let Some(libdir) = libdir.to_str() {
-            append_flag(&mut rustflags, "-L");
-            append_flag2(&mut rustflags, "native=", libdir);
+            append_flag(&mut rustflags, "-C target-feature=-crt-static");
+            append_flag2(&mut rustflags, "-L native=", libdir);
+            append_flag2(&mut rustflags, "-C link-arg=-Wl,-rpath-link,", libdir);
         }
 
-        if is_cc {
-            let includedir = sysroot.join("include").canonicalize()?;
-            if let Some(includedir) = includedir.to_str() {
-                append_flag2(&mut cppflags, "-I", includedir);
-            }
-            if let Some(libdir) = libdir.to_str() {
-                append_flag2(&mut ldflags, "-Wl,-rpath-link,", libdir);
-                append_flag2(&mut ldflags, "-L", libdir);
-            }
+        let includedir = sysroot.join("include").canonicalize()?;
+        if let Some(includedir) = includedir.to_str() {
+            append_flag2(&mut cppflags, "-I", includedir);
+        }
+        if let Some(libdir) = libdir.to_str() {
+            append_flag2(&mut ldflags, "-Wl,-rpath-link,", libdir);
+            append_flag2(&mut ldflags, "-L", libdir);
         }
     }
 
