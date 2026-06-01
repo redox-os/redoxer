@@ -121,7 +121,7 @@ pub fn get_sysroot() -> Option<PathBuf> {
         .or_else(|| {
             let path = get_cargo_sysroot_default_path()?;
             if path.join("lib").is_dir() {
-                return Some(path);
+                return path.canonicalize().ok();
             }
             None
         })
