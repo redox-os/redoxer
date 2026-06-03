@@ -544,7 +544,10 @@ impl RedoxerExecConfig {
                 _ => bail!("{argname} can be 'directory' or 'directory:path'"),
             };
             if map.insert(sysroot[1..].to_string(), dir).is_some() {
-                bail!("path on {argname} with format 'directory:path' must be unique");
+                bail!(
+                    "path {:?} on {argname} with format 'directory:path' must be unique",
+                    sysroot
+                );
             }
 
             Ok(())
@@ -623,7 +626,7 @@ impl RedoxerExecConfig {
             parse_folder(
                 &mut config.folders,
                 format!("{}/:/", sysroot.display()),
-                "--folder",
+                "REDOXER_SYSROOT",
             )?
         }
 
