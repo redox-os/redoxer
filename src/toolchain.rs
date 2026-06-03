@@ -103,8 +103,6 @@ fn toolchain_inner(is_update: bool, source_url: String) -> io::Result<PathBuf> {
         fs::remove_dir_all(&toolchain_dir)?;
     }
     if !toolchain_dir.is_dir() {
-        println!("redoxer: building toolchain from {source_url:?}");
-
         let toolchain_partial = redoxer_dir().join("toolchain.partial");
         if toolchain_partial.is_dir() {
             fs::remove_dir_all(&toolchain_partial)?;
@@ -112,10 +110,11 @@ fn toolchain_inner(is_update: bool, source_url: String) -> io::Result<PathBuf> {
         fs::create_dir_all(&toolchain_partial)?;
 
         if source_is_remote {
+            let prefix_tar = toolchain_partial.join("relibc-install.tar.gz");
+            println!("redoxer: downloading toolchain from {prefix_tar:?}");
             let shasum_file = toolchain_partial.join("SHA256SUM");
             download(&format!("{}/SHA256SUM", url), &shasum_file)?;
 
-            let prefix_tar = toolchain_partial.join("relibc-install.tar.gz");
             download(&format!("{}/relibc-install.tar.gz", url), &prefix_tar)?;
 
             if !shasum(&shasum_file)? {
@@ -134,16 +133,27 @@ fn toolchain_inner(is_update: bool, source_url: String) -> io::Result<PathBuf> {
             fs::remove_file(&shasum_file)?;
             fs::remove_file(&prefix_tar)?;
         } else {
-            let prefix_tar = format!("{}/relibc-install.tar.gz", url);
-
-            Command::new("tar")
-                .arg("--extract")
-                .arg("--file")
-                .arg(&prefix_tar)
-                .arg("-C")
-                .arg(&toolchain_partial)
-                .status()
-                .and_then(status_error)?;
+            let prefix_dir = PathBuf::from(format!("{}/sysroot", url));
+            if prefix_dir.is_dir() {
+                println!("redoxer: copying toolchain from {prefix_dir:?}");
+                Command::new("rsync")
+                    .arg("-a")
+                    .arg(&format!("{}/", prefix_dir.display()))
+                    .arg(&toolchain_partial)
+                    .status()
+                    .and_then(status_error)?;
+            } else {
+                let prefix_tar = format!("{}/relibc-install.tar.gz", url);
+                println!("redoxer: extracting toolchain from {prefix_tar:?}");
+                Command::new("tar")
+                    .arg("--extract")
+                    .arg("--file")
+                    .arg(&prefix_tar)
+                    .arg("-C")
+                    .arg(&toolchain_partial)
+                    .status()
+                    .and_then(status_error)?;
+            }
         }
 
         fs::rename(&toolchain_partial, &toolchain_dir)?;
