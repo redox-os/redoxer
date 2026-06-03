@@ -45,6 +45,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     let cc_target_var = target.replace("-", "_");
     let cargo_target_var = cc_target_var.to_uppercase();
     let is_clang = crate::is_use_clang();
+    let is_cc = program.as_ref() != "env" && program.as_ref() != "cargo";
     let mut command = process::Command::new(program);
     for (k, v) in gnu_targets.iter() {
         if *k == "CC" || *k == "CXX" {
@@ -102,6 +103,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     }
 
     // LDFLAGS
+    #[allow(unused_mut)]
     let mut ldflags = env::var("LDFLAGS").unwrap_or("".to_string());
     // TODO: https://gitlab.redox-os.org/redox-os/redox/-/issues/1788
     // if is_clang {
@@ -123,18 +125,15 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
         command.env("PKG_CONFIG", "pkg-config");
         command.env(format!("PKG_CONFIG_{cc_target_var}"), "pkg-config");
 
+        let includedir = sysroot.join("include").canonicalize()?;
+        if let Some(includedir) = includedir.to_str() {
+            append_flag2(&mut cppflags, "-I", includedir);
+        }
         let libdir = sysroot.join("lib").canonicalize()?;
         if let Some(libdir) = libdir.to_str() {
             append_flag(&mut rustflags, "-C target-feature=-crt-static");
             append_flag2(&mut rustflags, "-L native=", libdir);
             append_flag2(&mut rustflags, "-C link-arg=-Wl,-rpath-link,", libdir);
-        }
-
-        let includedir = sysroot.join("include").canonicalize()?;
-        if let Some(includedir) = includedir.to_str() {
-            append_flag2(&mut cppflags, "-I", includedir);
-        }
-        if let Some(libdir) = libdir.to_str() {
             append_flag2(&mut ldflags, "-Wl,-rpath-link,", libdir);
             append_flag2(&mut ldflags, "-L", libdir);
         }
@@ -144,9 +143,15 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
         command.env("CPPFLAGS", &cppflags);
         command.env(format!("CFLAGS_{}", cc_target_var), &cppflags);
         command.env(format!("CXXFLAGS_{}", cc_target_var), &cppflags);
+        if is_cc {
+            command.args(cppflags.split_ascii_whitespace());
+        };
     }
     if !ldflags.is_empty() {
-        command.env("LDFLAGS", ldflags);
+        command.env("LDFLAGS", &ldflags);
+        if is_cc {
+            command.args(ldflags.split_ascii_whitespace());
+        };
     }
     if !rustflags.is_empty() {
         command.env(
