@@ -62,7 +62,7 @@ redoxer toolchain
 - Update the Redox toolchain using prebuilt toolchain from existing Redox OS Repo
 
 ```sh
-make prefix/x86_64-unknown-redox/relibc-install.tar.gz
+make prefix
 redoxer toolchain --update --url .
 ```
 
