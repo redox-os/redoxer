@@ -618,6 +618,15 @@ impl RedoxerExecConfig {
             }
         }
 
+        #[cfg(feature = "cli-pkg")]
+        if let Some(sysroot) = crate::pkg::get_sysroot() {
+            parse_folder(
+                &mut config.folders,
+                format!("{}/:/", sysroot.display()),
+                "--folder",
+            )?
+        }
+
         if !config.artifacts.is_empty() && !config.fuse {
             bail!("--artifact requires REDOXER_USE_FUSE=true");
         }
