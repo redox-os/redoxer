@@ -24,7 +24,7 @@ fn download<P: AsRef<Path>>(url: &str, path: P) -> io::Result<()> {
         .and_then(status_error)
 }
 
-fn shasum<P: AsRef<Path>>(path: P) -> io::Result<bool> {
+fn read_shasum<P: AsRef<Path>>(path: P) -> io::Result<Vec<(String, PathBuf)>> {
     let path = path.as_ref();
     let Some(parent) = path.parent() else {
         return Err(io::Error::other("shasum path had no parent"));
@@ -33,9 +33,7 @@ fn shasum<P: AsRef<Path>>(path: P) -> io::Result<bool> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
 
-    let mut all_match = true;
-    let mut checked_any = false;
-
+    let mut result = Vec::new();
     for line in reader.lines() {
         let line = line?;
         let line = line.trim();
@@ -48,8 +46,18 @@ fn shasum<P: AsRef<Path>>(path: P) -> io::Result<bool> {
         let (expected_hash, remainder) = line.split_at(64);
         let filename = remainder.trim_start_matches([' ', '*']);
         let target_path = parent.join(filename);
+        result.push((expected_hash.to_string(), target_path));
+    }
 
-        let mut target_file = match File::open(&target_path) {
+    Ok(result)
+}
+
+fn check_shasum(shasum: &Vec<(String, PathBuf)>) -> io::Result<bool> {
+    let mut all_match = true;
+    let mut checked_any = false;
+
+    for (expected_hash, target_path) in shasum {
+        let mut target_file = match File::open(target_path) {
             Ok(f) => f,
             Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
             Err(e) => return Err(e),
@@ -70,7 +78,7 @@ fn shasum<P: AsRef<Path>>(path: P) -> io::Result<bool> {
         let result = hasher.finalize();
         let actual_hash = format!("{:x}", result);
 
-        if actual_hash != expected_hash {
+        if actual_hash != *expected_hash {
             all_match = false;
             eprintln!(
                 "sha256sum not match for {:?}:",
@@ -110,14 +118,29 @@ fn toolchain_inner(is_update: bool, source_url: String) -> io::Result<PathBuf> {
         fs::create_dir_all(&toolchain_partial)?;
 
         if source_is_remote {
-            let prefix_tar = toolchain_partial.join("relibc-install.tar.gz");
-            println!("redoxer: downloading toolchain from {prefix_tar:?}");
-            let shasum_file = toolchain_partial.join("SHA256SUM");
-            download(&format!("{}/SHA256SUM", url), &shasum_file)?;
+            const SHASUM_FILENAME: &str = "SHA256SUM";
+            const RELIBC_FILENAME: &str = "relibc-install.tar.gz";
+            let prefix_tar = toolchain_partial.join(RELIBC_FILENAME);
+            println!("redoxer: downloading toolchain from {url:?}");
+            let shasum_file = toolchain_partial.join(SHASUM_FILENAME);
+            download(&format!("{}/{}", url, SHASUM_FILENAME), &shasum_file)?;
+            let shasum_data = read_shasum(&shasum_file)?;
+            let Some((shasum_hash, _)) = shasum_data.iter().find(|(_, path)| {
+                matches!(
+                    path.file_name().and_then(|f| f.to_str()),
+                    Some(RELIBC_FILENAME)
+                )
+            }) else {
+                println!("redoxer: {shasum_file:?} has no entry for {RELIBC_FILENAME}");
+                return Err(io::Error::other("shasum not found"));
+            };
 
-            download(&format!("{}/relibc-install.tar.gz", url), &prefix_tar)?;
+            download(
+                &format!("{}/{}?cache-buster={}", url, RELIBC_FILENAME, shasum_hash),
+                &prefix_tar,
+            )?;
 
-            if !shasum(&shasum_file)? {
+            if !check_shasum(&shasum_data)? {
                 return Err(io::Error::other("shasum invalid"));
             }
 
