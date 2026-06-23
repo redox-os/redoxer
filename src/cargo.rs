@@ -9,13 +9,15 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
     #[cfg(feature = "cli-exec")]
     let (runner, arguments) = {
         use anyhow::Context;
+        use std::fs;
         let mut runner_config = crate::exec::RedoxerExecConfig::new(args)
             .context("Unable to parse exec configuration")?;
         let arguments = runner_config.arguments.clone();
         runner_config.arguments = Vec::new();
-        runner_config
-            .folders
-            .insert("root".to_string(), ".".to_string());
+        runner_config.folders.insert(
+            "root".to_string(),
+            format!("{}/", fs::canonicalize(".")?.display()),
+        );
 
         let mut runner = vec![command, "exec".to_string()];
         runner.extend(runner_config.to_args().into_iter().map(|s| {
