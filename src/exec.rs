@@ -14,7 +14,7 @@ use crate::{host_target, parse_bool_env, redoxer_dir, status_error, target};
 // extra disk space to fit large projects
 const DISK_SIZE: u64 = 3 * 1024 * 1024 * 1024;
 // need to fit under the default RAM
-const DISK_SIZE_LIVE: u64 = 1024 * 1024 * 1024;
+const DISK_SIZE_LIVE: u64 = 256 * 1024 * 1024;
 
 pub fn qemu_executable() -> &'static str {
     match target() {
