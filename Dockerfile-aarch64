@@ -37,6 +37,9 @@ RUN redoxer toolchain
 # Ensure redoxer exec is working
 RUN redoxer exec true
 
+# Ensure redoxer exec network is working
+RUN redoxer exec pkg test
+
 # Ensure redoxer test is working
 RUN cd /root/redoxer/example && redoxer test
 
