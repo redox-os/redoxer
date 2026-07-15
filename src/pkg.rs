@@ -100,15 +100,17 @@ pub fn main(args: &[String]) {
 
     let pkgs = pkgs
         .iter()
-        .map(|p| PackageName::new(p.to_string()).expect(&format!("Invalid pkg name: {p}")))
+        .map(|p| {
+            PackageName::new(p.to_string()).unwrap_or_else(|_| panic!("Invalid pkg name: {p}"))
+        })
         .collect();
 
     match pkg_inner(sysroot, source, cmd, pkgs) {
-        Ok(_) => {
+        Ok(()) => {
             process::exit(0);
         }
         Err(err) => {
-            eprintln!("redoxer toolchain: {}", err);
+            eprintln!("redoxer toolchain: {err}");
             process::exit(1);
         }
     }

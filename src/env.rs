@@ -48,13 +48,12 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     let is_cc = program.as_ref() != "env" && program.as_ref() != "cargo";
     let mut command = process::Command::new(program);
     for (k, v) in gnu_targets.iter() {
-        if *k == "CC" || *k == "CXX" {
-            if let Ok(cc_wrapper) = std::env::var("CC_WRAPPER") {
-                if !cc_wrapper.is_empty() {
-                    command.env(k, format!("{cc_wrapper} {v}"));
-                    continue;
-                }
-            }
+        if (*k == "CC" || *k == "CXX")
+            && let Ok(cc_wrapper) = std::env::var("CC_WRAPPER")
+            && !cc_wrapper.is_empty()
+        {
+            command.env(k, format!("{cc_wrapper} {v}"));
+            continue;
         }
         command.env(k, v);
         command.env(format!("{k}_{cc_target_var}"), v);
@@ -62,7 +61,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
 
     // CARGO
     command.env(
-        format!("CARGO_TARGET_{}_LINKER", cargo_target_var),
+        format!("CARGO_TARGET_{cargo_target_var}_LINKER"),
         if is_clang {
             "clang"
         } else {
@@ -81,7 +80,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     //      https://github.com/rust-lang/cargo/issues/4423
     //      which claims there's no RUSTFLAGS for build.rs
     // 3. There are no CARGO_TARGET_xxx_ENCODED_RUSTFLAGS
-    let mut rustflags = env::var("RUSTFLAGS").unwrap_or("".to_string());
+    let mut rustflags = env::var("RUSTFLAGS").unwrap_or_default();
     if target_is_64bit(target) {
         append_flag(&mut rustflags, "-C force-frame-pointers=yes");
     }
@@ -95,7 +94,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     }
 
     // CPPFLAGS
-    let mut cppflags = env::var("CPPFLAGS").unwrap_or_else(|_| "".to_string());
+    let mut cppflags = env::var("CPPFLAGS").unwrap_or_else(|_| String::new());
     match target {
         "aarch64-unknown-redox" => append_flag(&mut cppflags, "-mno-outline-atomics"),
         "riscv64gc-unknown-redox" => append_flag(&mut cppflags, "-march=rv64gc -mabi=lp64d"),
@@ -104,7 +103,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
 
     // LDFLAGS
     #[allow(unused_mut)]
-    let mut ldflags = env::var("LDFLAGS").unwrap_or("".to_string());
+    let mut ldflags = env::var("LDFLAGS").unwrap_or_default();
     // TODO: https://gitlab.redox-os.org/redox-os/redox/-/issues/1788
     // if is_clang {
     //     append_flag(&mut ldflags, "-fuse-ld=lld");
@@ -114,13 +113,10 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     if let Some(sysroot) = crate::pkg::get_sysroot() {
         // pkg-config crate specific
         command.env(
-            format!("PKG_CONFIG_PATH_{}", cc_target_var),
+            format!("PKG_CONFIG_PATH_{cc_target_var}"),
             sysroot.join("lib/pkgconfig"),
         );
-        command.env(
-            format!("PKG_CONFIG_SYSROOT_DIR_{}", cc_target_var),
-            &sysroot,
-        );
+        command.env(format!("PKG_CONFIG_SYSROOT_DIR_{cc_target_var}"), &sysroot);
         // we've set `PKG_CONFIG_PATH` and prefixed pkg-config isn't available
         command.env("PKG_CONFIG", "pkg-config");
         command.env(format!("PKG_CONFIG_{cc_target_var}"), "pkg-config");
@@ -141,21 +137,21 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
 
     if !cppflags.is_empty() {
         command.env("CPPFLAGS", &cppflags);
-        command.env(format!("CFLAGS_{}", cc_target_var), &cppflags);
-        command.env(format!("CXXFLAGS_{}", cc_target_var), &cppflags);
+        command.env(format!("CFLAGS_{cc_target_var}"), &cppflags);
+        command.env(format!("CXXFLAGS_{cc_target_var}"), &cppflags);
         if is_cc {
             command.args(cppflags.split_ascii_whitespace());
-        };
+        }
     }
     if !ldflags.is_empty() {
         command.env("LDFLAGS", &ldflags);
         if is_cc {
             command.args(ldflags.split_ascii_whitespace());
-        };
+        }
     }
     if !rustflags.is_empty() {
         command.env(
-            format!("CARGO_TARGET_{}_RUSTFLAGS", cargo_target_var),
+            format!("CARGO_TARGET_{cargo_target_var}_RUSTFLAGS"),
             rustflags,
         );
         command.env_remove("RUSTFLAGS");
@@ -174,7 +170,7 @@ fn inner<I: Iterator<Item = String>>(program: &str, args: I) -> anyhow::Result<(
         "ar" => format!("{}-ar", gnu_target()),
         "cc" => format!("{}-gcc", gnu_target()),
         "cxx" => format!("{}-g++", gnu_target()),
-        _ => return Err(anyhow!("Unknown env program {:?}", program)),
+        _ => return Err(anyhow!("Unknown env program {program:?}")),
     };
     command(program)?
         .args(args)
@@ -189,26 +185,26 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
     let mut h = HashMap::new();
     if !crate::is_use_clang() {
         let target_prefix = if is_host {
-            "".to_string()
+            String::new()
         } else {
             format!("{}-", gnu_target())
         };
 
-        h.insert("AR", format!("{}gcc-ar", target_prefix));
-        h.insert("AS", format!("{}as", target_prefix));
-        h.insert("CC", format!("{}gcc", target_prefix));
-        h.insert("CXX", format!("{}g++", target_prefix));
-        h.insert("LD", format!("{}ld", target_prefix));
-        h.insert("NM", format!("{}gcc-nm", target_prefix));
-        h.insert("OBJCOPY", format!("{}objcopy", target_prefix));
-        h.insert("OBJDUMP", format!("{}objdump", target_prefix));
-        h.insert("PKG_CONFIG", format!("{}pkg-config", target_prefix));
-        h.insert("RANLIB", format!("{}gcc-ranlib", target_prefix));
-        h.insert("READELF", format!("{}readelf", target_prefix));
-        h.insert("STRIP", format!("{}strip", target_prefix));
+        h.insert("AR", format!("{target_prefix}gcc-ar"));
+        h.insert("AS", format!("{target_prefix}as"));
+        h.insert("CC", format!("{target_prefix}gcc"));
+        h.insert("CXX", format!("{target_prefix}g++"));
+        h.insert("LD", format!("{target_prefix}ld"));
+        h.insert("NM", format!("{target_prefix}gcc-nm"));
+        h.insert("OBJCOPY", format!("{target_prefix}objcopy"));
+        h.insert("OBJDUMP", format!("{target_prefix}objdump"));
+        h.insert("PKG_CONFIG", format!("{target_prefix}pkg-config"));
+        h.insert("RANLIB", format!("{target_prefix}gcc-ranlib"));
+        h.insert("READELF", format!("{target_prefix}readelf"));
+        h.insert("STRIP", format!("{target_prefix}strip"));
     } else {
         let target_flag = if is_host {
-            "".to_string()
+            String::new()
         } else {
             let toolchain = toolchain()
                 .expect("Should have toolchain init")
@@ -222,7 +218,7 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
         };
 
         let target_cxxflag = if is_host {
-            "".to_string()
+            String::new()
         } else {
             let toolchain = toolchain()
                 .expect("Should have toolchain init")
@@ -246,17 +242,17 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
         h.insert("RANLIB", "llvm-ranlib".to_string());
         h.insert("READELF", "llvm-readelf".to_string());
         h.insert("STRIP", "llvm-strip".to_string());
-        h.insert("AS", format!("clang{}", target_flag));
-        h.insert("CC", format!("clang{}", target_flag));
-        h.insert("CXX", format!("clang++{}{}", target_flag, target_cxxflag));
+        h.insert("AS", format!("clang{target_flag}"));
+        h.insert("CC", format!("clang{target_flag}"));
+        h.insert("CXX", format!("clang++{target_flag}{target_cxxflag}"));
         h.insert("PKG_CONFIG", "pkg-config".to_string());
     }
     if is_host {
         for (k, v) in h.iter_mut() {
-            if let Ok(env) = std::env::var(format!("REDOXER_HOST_{}", k)) {
-                if !env.is_empty() {
-                    *v = env;
-                }
+            if let Ok(env) = std::env::var(format!("REDOXER_HOST_{k}"))
+                && !env.is_empty()
+            {
+                *v = env;
             }
         }
     }
@@ -269,7 +265,7 @@ pub fn main(args: &[String]) {
             process::exit(0);
         }
         Err(err) => {
-            eprintln!("redoxer env: {:#}", err);
+            eprintln!("redoxer env: {err:#}");
             process::exit(1);
         }
     }

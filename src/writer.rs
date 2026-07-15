@@ -23,10 +23,7 @@ pub fn write_redoxerd_config(
                 .ok_or(io::Error::other("folder path is not valid UTF-8"))?;
             if arg.starts_with(folder_canonical) {
                 let arg_replace = arg.replace(folder_canonical, "/root");
-                eprintln!(
-                    "redoxer: replacing '{}' with '{}' in arguments",
-                    arg, arg_replace
-                );
+                eprintln!("redoxer: replacing '{arg}' with '{arg_replace}' in arguments");
                 redoxerd_config.push_str(&arg_replace);
                 redoxerd_config.push('\n');
                 continue;
@@ -106,11 +103,11 @@ pub fn main(args: &[String]) {
     let config = RedoxerConfig::new(args.iter().skip(2).cloned());
 
     match write_redoxerd_config(&config.root, &config.arguments, config.folder.as_deref()) {
-        Ok(_) => {
+        Ok(()) => {
             process::exit(0);
         }
         Err(err) => {
-            eprintln!("redoxer write-exec: {:#}", err);
+            eprintln!("redoxer write-exec: {err:#}");
             process::exit(1);
         }
     }
