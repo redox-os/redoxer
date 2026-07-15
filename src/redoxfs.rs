@@ -170,8 +170,7 @@ pub fn archive_image(
 }
 
 pub fn run_install_to_dir(config: redox_installer::Config, base_dir: &Path) -> io::Result<()> {
-    redox_installer::install(config, base_dir)
-        .map_err(|err| io::Error::other(format!("{}", err)))?;
+    redox_installer::install(config, base_dir).map_err(|err| io::Error::other(format!("{err}")))?;
     Ok(())
 }
 
@@ -252,7 +251,7 @@ pub(crate) fn expand_disk(disk_path: &Path, desired_size: u64) -> anyhow::Result
                 .context("Unable to expand disk file metadata")?;
         } else {
             return Ok(());
-        };
+        }
     }
 
     {
@@ -297,7 +296,7 @@ fn resize<D: redoxfs::Disk>(fs: &mut FileSystem<D>, shrink: bool) -> Result<(u64
     let disk_size = fs
         .disk
         .size()
-        .map_err(|err| format!("failed to read disk size: {}", err))?;
+        .map_err(|err| format!("failed to read disk size: {err}"))?;
 
     // Find contiguous free region
     //TODO: better error management
@@ -322,7 +321,7 @@ fn resize<D: redoxfs::Disk>(fs: &mut FileSystem<D>, shrink: bool) -> Result<(u64
         }
         Ok(())
     })
-    .map_err(|err| format!("failed to read alloc log: {}", err))?;
+    .map_err(|err| format!("failed to read alloc log: {err}"))?;
 
     let old_size = fs.header.size();
     let min_size = if let Some(entry) = last_free {
@@ -369,7 +368,7 @@ fn resize<D: redoxfs::Disk>(fs: &mut FileSystem<D>, shrink: bool) -> Result<(u64
 
         Ok(())
     })
-    .map_err(|err| format!("transaction failed: {}", err))?;
+    .map_err(|err| format!("transaction failed: {err}"))?;
 
     Ok((old_size, new_size))
 }

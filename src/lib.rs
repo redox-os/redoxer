@@ -34,7 +34,7 @@ fn status_error(status: process::ExitStatus) -> io::Result<()> {
     if status.success() {
         Ok(())
     } else {
-        Err(io::Error::other(format!("{}", status)))
+        Err(io::Error::other(format!("{status}")))
     }
 }
 
@@ -56,13 +56,13 @@ fn usage() {
     eprintln!("redoxer test - cargo test with Redox target in Redox VM");
     eprintln!("redoxer write-exec - write redoxer exec test configuration");
     eprintln!("redoxer toolchain - install toolchain");
-    eprintln!("");
+    eprintln!();
     eprintln!("Visit https://crates.io/crates/redox_installer for more help");
     process::exit(1);
 }
 
 pub fn target() -> &'static str {
-    let target_from_env = std::env::var("TARGET").unwrap_or("".to_string());
+    let target_from_env = std::env::var("TARGET").unwrap_or_default();
 
     // Allow compilation for host if explicitly requested
     if target_from_env == host_target() {
@@ -142,9 +142,9 @@ pub(crate) fn parse_bool_env(name: &str) -> Option<bool> {
     match std::env::var(name).as_deref() {
         Ok("true" | "1") => Some(true),
         Ok("false" | "0") => Some(false),
-        Ok(arg) => panic!("invalid argument {} for {}", arg, name),
+        Ok(arg) => panic!("invalid argument {arg} for {name}"),
         Err(VarError::NotPresent) => None,
-        Err(VarError::NotUnicode(_)) => panic!("non-utf8 argument for {}", name),
+        Err(VarError::NotUnicode(_)) => panic!("non-utf8 argument for {name}"),
     }
 }
 

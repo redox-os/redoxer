@@ -76,7 +76,7 @@ fn check_shasum(shasum: &Vec<(String, PathBuf)>) -> io::Result<bool> {
         }
 
         let result = hasher.finalize();
-        let actual_hash = format!("{:x}", result);
+        let actual_hash = format!("{result:x}");
 
         if actual_hash != *expected_hash {
             all_match = false;
@@ -123,7 +123,7 @@ fn toolchain_inner(is_update: bool, source_url: String) -> io::Result<PathBuf> {
             let prefix_tar = toolchain_partial.join(RELIBC_FILENAME);
             println!("redoxer: downloading toolchain from {url:?}");
             let shasum_file = toolchain_partial.join(SHASUM_FILENAME);
-            download(&format!("{}/{}", url, SHASUM_FILENAME), &shasum_file)?;
+            download(&format!("{url}/{SHASUM_FILENAME}"), &shasum_file)?;
             let shasum_data = read_shasum(&shasum_file)?;
             let Some((shasum_hash, _)) = shasum_data.iter().find(|(_, path)| {
                 matches!(
@@ -136,7 +136,7 @@ fn toolchain_inner(is_update: bool, source_url: String) -> io::Result<PathBuf> {
             };
 
             download(
-                &format!("{}/{}?cache-buster={}", url, RELIBC_FILENAME, shasum_hash),
+                &format!("{url}/{RELIBC_FILENAME}?cache-buster={shasum_hash}"),
                 &prefix_tar,
             )?;
 
@@ -156,17 +156,17 @@ fn toolchain_inner(is_update: bool, source_url: String) -> io::Result<PathBuf> {
             fs::remove_file(&shasum_file)?;
             fs::remove_file(&prefix_tar)?;
         } else {
-            let prefix_dir = PathBuf::from(format!("{}/sysroot", url));
+            let prefix_dir = PathBuf::from(format!("{url}/sysroot"));
             if prefix_dir.is_dir() {
                 println!("redoxer: copying toolchain from {prefix_dir:?}");
                 Command::new("rsync")
                     .arg("-a")
-                    .arg(&format!("{}/", prefix_dir.display()))
+                    .arg(format!("{}/", prefix_dir.display()))
                     .arg(&toolchain_partial)
                     .status()
                     .and_then(status_error)?;
             } else {
-                let prefix_tar = format!("{}/relibc-install.tar.gz", url);
+                let prefix_tar = format!("{url}/relibc-install.tar.gz");
                 println!("redoxer: extracting toolchain from {prefix_tar:?}");
                 Command::new("tar")
                     .arg("--extract")
@@ -213,7 +213,7 @@ pub fn main(args: &[String]) {
             }
             "--url" => {
                 if i + 1 < args.len() {
-                    source_url = args[i + 1].clone();
+                    source_url.clone_from(&args[i + 1]);
                     i += 1;
                 } else {
                     eprintln!("Error: --url requires a value.");
@@ -221,7 +221,7 @@ pub fn main(args: &[String]) {
                 }
             }
             arg => {
-                eprintln!("Warning: Unrecognized argument: {}", arg);
+                eprintln!("Warning: Unrecognized argument: {arg}");
             }
         }
         i += 1;
@@ -232,7 +232,7 @@ pub fn main(args: &[String]) {
             process::exit(0);
         }
         Err(err) => {
-            eprintln!("redoxer toolchain: {}", err);
+            eprintln!("redoxer toolchain: {err}");
             process::exit(1);
         }
     }

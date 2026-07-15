@@ -152,7 +152,7 @@ fn bootloader() -> anyhow::Result<PathBuf> {
             .packages
             .insert("bootloader".to_string(), Default::default());
         redox_installer::install(config, &bootloader_dir)
-            .map_err(|err| io::Error::other(format!("{}", err)))?;
+            .map_err(|err| io::Error::other(format!("{err}")))?;
 
         fs::rename(
             bootloader_dir.join(if qemu_use_uefi() {
@@ -175,7 +175,7 @@ fn base(
 ) -> anyhow::Result<(PathBuf, bool)> {
     let ext = if fuse { "bin" } else { "tar" };
 
-    let base_file = redoxer_dir().join(format!("{}.{}", name, ext));
+    let base_file = redoxer_dir().join(format!("{name}.{ext}"));
     let base_tar = redoxer_dir().join(format!("{}.{}", name, "tar"));
     let base_toml = redoxer_dir().join(format!("{}.{}", name, "toml"));
 
@@ -186,13 +186,13 @@ fn base(
     if base_toml.is_file() && base_file.is_file() {
         let r = fs::read_to_string(&base_toml).context("Unable to read base toml")?;
         if r != config_str {
-            eprintln!("redoxer: clearing old {}", name);
+            eprintln!("redoxer: clearing old {name}");
             fs::remove_file(&base_toml).context("Unable to delete base toml")?;
             fs::remove_file(&base_file).context("Unable to delete base bin/tar")?;
         }
     }
     if !base_file.is_file() {
-        eprintln!("redoxer: building {}", name);
+        eprintln!("redoxer: building {name}");
 
         let base_dir = redoxer_dir().join(name);
         if base_dir.is_dir() {
@@ -200,7 +200,7 @@ fn base(
         }
         fs::create_dir_all(&base_dir)?;
 
-        let base_partial = redoxer_dir().join(format!("{}.{}.partial", name, ext));
+        let base_partial = redoxer_dir().join(format!("{name}.{ext}.partial"));
         if base_partial.is_file() {
             fs::remove_file(&base_partial)?;
         }
@@ -220,7 +220,7 @@ fn base(
 
             // only shrink disk outside CI
             if !base_tar.exists() {
-                eprintln!("redoxer: shrinking {}", name);
+                eprintln!("redoxer: shrinking {name}");
                 // TODO: The bootloader unable to boot
                 if !qemu_use_uefi() {
                     shrink_disk(&base_partial)?;
@@ -229,7 +229,7 @@ fn base(
         } else {
             run_install_to_dir(config, &base_dir)?;
 
-            eprintln!("redoxer: compressing {}", name);
+            eprintln!("redoxer: compressing {name}");
             Command::new("tar")
                 .arg("-c")
                 .arg("-p")
@@ -364,11 +364,11 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
             write_redoxerd_config(
                 &dest_dir,
                 &config.arguments,
-                config.folders.get("root").map(|s| s.as_str()),
+                config.folders.get("root").map(std::string::String::as_str),
             )?;
 
             for (sysroot, folder) in config.folders.iter() {
-                eprintln!("redoxer: copying '{folder}' to '/{sysroot}'",);
+                eprintln!("redoxer: copying '{folder}' to '/{sysroot}'");
 
                 let dst_dir = dest_dir.join(sysroot);
                 if !dst_dir.is_dir() {
@@ -428,7 +428,7 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
         }
 
         if qemu_verbose {
-            eprintln!("{:?}", command);
+            eprintln!("{command:?}");
         }
         let status = command.status().context("unable to get redoxer status")?;
 
@@ -444,12 +444,12 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
                 1
             }
             _ => {
-                eprintln!("## redoxer (failure, qemu exit status {}) ##", status);
+                eprintln!("## redoxer (failure, qemu exit status {status}) ##");
                 2
             }
         };
 
-        match config.output.as_ref().map(|s| s.as_str()) {
+        match config.output.as_deref() {
             Some("-") => print!("{}", fs::read_to_string(&redoxer_log)?),
             Some(output) => fs::copy(&redoxer_log, output).map(|_| {})?,
             None => {}
@@ -606,18 +606,17 @@ impl RedoxerExecConfig {
             }
         }
 
-        if !config.folders.contains_key("root") {
-            if let Some(cmd) = config.arguments.first() {
-                if Path::new(cmd).is_file() {
-                    if !cmd.contains('/') {
-                        eprintln!(
-                            "WARN: Skipping copy, you might mean to run exec with ./{}",
-                            cmd
-                        )
-                    } else {
-                        config.folders.insert("root".to_string(), cmd.to_string());
-                    }
-                }
+        if !config.folders.contains_key("root")
+            && let Some(cmd) = config.arguments.first()
+            && Path::new(cmd).is_file()
+        {
+            if !cmd.contains('/') {
+                eprintln!(
+                    "WARN: Skipping copy, you might mean to run exec with ./{}",
+                    cmd
+                )
+            } else {
+                config.folders.insert("root".to_string(), cmd.to_string());
             }
         }
 
@@ -642,12 +641,12 @@ impl RedoxerExecConfig {
 
         for (sysroot, host_dir) in &self.folders {
             args.push("--folder".to_string());
-            args.push(format!("{}:/{}", host_dir, sysroot));
+            args.push(format!("{host_dir}:/{sysroot}"));
         }
 
         for (sysroot, host_dir) in &self.artifacts {
             args.push("--artifact".to_string());
-            args.push(format!("{}:/{}", host_dir, sysroot));
+            args.push(format!("{host_dir}:/{sysroot}"));
         }
 
         if self.config_name == "gui" {
@@ -675,7 +674,7 @@ pub fn main(args: &[String]) {
     let config = match RedoxerExecConfig::new(args.iter().skip(2).cloned()) {
         Ok(config) => config,
         Err(err) => {
-            eprintln!("{:?}", err);
+            eprintln!("{err:?}");
             usage();
         }
     };
@@ -688,7 +687,7 @@ pub fn main(args: &[String]) {
             process::exit(code);
         }
         Err(err) => {
-            eprintln!("redoxer exec: {:#}", err);
+            eprintln!("redoxer exec: {err:#}");
             process::exit(3);
         }
     }
