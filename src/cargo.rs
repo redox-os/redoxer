@@ -22,7 +22,7 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
         let mut runner = vec![command, "exec".to_string()];
         runner.extend(runner_config.to_args().into_iter().map(|s| {
             if s.contains([' ', '"', '\'', '\n']) {
-                format!("{:?}", s)
+                format!("{s:?}")
             } else {
                 s
             }
@@ -58,7 +58,7 @@ fn inner<I: Iterator<Item = String>>(mut args: I) -> anyhow::Result<()> {
         .arg("--target")
         .arg(target())
         .args(arguments)
-        .env(format!("CARGO_TARGET_{}_RUNNER", cargo_target_var), runner)
+        .env(format!("CARGO_TARGET_{cargo_target_var}_RUNNER"), runner)
         .status()
         .and_then(status_error)?;
 
@@ -71,7 +71,7 @@ pub fn main(args: &[String]) {
             process::exit(0);
         }
         Err(err) => {
-            eprintln!("redoxer cargo: {}", err);
+            eprintln!("redoxer cargo: {err}");
             process::exit(1);
         }
     }
