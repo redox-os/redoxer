@@ -51,6 +51,11 @@ pub fn write_redoxerd_config(
     if !init_redoxer_path.is_file() {
         fs::write(&init_redoxer_path, INIT_REDOXER)?;
     }
+    let root_dir = dest_dir.join("root");
+    if !root_dir.is_dir() {
+        // needed for cwd
+        fs::create_dir(&root_dir)?;
+    }
     Ok(())
 }
 

@@ -23,36 +23,41 @@ fn pkg_inner(
     source: String,
     cmd: PkgCommand,
     pkgs: Vec<PackageName>,
-) -> io::Result<()> {
+) -> Result<(), Error> {
     let callback = IndicatifCallback::new();
-
-    if !sysroot.is_dir() {
-        println!("redoxer: building pkg sysroot");
-        fs::create_dir_all(sysroot.join("etc/pkg.d"))?;
-        fs::create_dir(sysroot.join("usr"))?;
-        fs::write(sysroot.join("etc/pkg.d/10_redoxer"), source)?;
-        for folder in &["bin", "include", "lib", "share"] {
-            fs::create_dir(sysroot.join("usr").join(folder))?;
-            unix::fs::symlink(format!("usr/{folder}"), sysroot.join(folder))?;
-        }
-    }
-
-    let mut library = Library::new(sysroot, target(), Rc::new(RefCell::new(callback))).unwrap();
+    pkg_dir_init(&sysroot, source).map_err(Error::IO)?;
+    let mut library = Library::new(sysroot, target(), Rc::new(RefCell::new(callback)))?;
 
     match cmd {
         PkgCommand::Install => library.install(pkgs),
         PkgCommand::Update => library.update(pkgs),
         PkgCommand::Remove => library.uninstall(pkgs),
-    }
-    .unwrap();
+    }?;
 
-    library
-        .apply()
-        .map_err(|e: Error| {
-            eprintln!("Unable to complete pkg action: {e}");
-            process::exit(1);
-        })
-        .unwrap();
+    library.apply()?;
+
+    Ok(())
+}
+
+fn pkg_dir_init(sysroot: &Path, source: String) -> io::Result<()> {
+    let (etc_d, usr) = (sysroot.join("etc/pkg.d"), sysroot.join("usr"));
+    let (etc_d_exist, usr_exist) = (etc_d.is_dir(), usr.is_dir());
+    if !etc_d_exist || !usr_exist {
+        println!("redoxer: building pkg sysroot");
+    }
+
+    if !etc_d_exist {
+        fs::create_dir_all(&etc_d)?;
+        fs::write(sysroot.join("etc/pkg.d/10_redoxer"), source)?;
+    }
+
+    if !usr_exist {
+        fs::create_dir_all(&usr)?;
+        for folder in ["bin", "include", "lib", "share"] {
+            fs::create_dir(usr.join(folder))?;
+            unix::fs::symlink(format!("usr/{folder}"), sysroot.join(folder))?;
+        }
+    }
 
     Ok(())
 }
@@ -110,7 +115,7 @@ pub fn main(args: &[String]) {
             process::exit(0);
         }
         Err(err) => {
-            eprintln!("redoxer toolchain: {err}");
+            eprintln!("redoxer pkg: {err}");
             process::exit(1);
         }
     }
