@@ -44,6 +44,7 @@ fn usage() {
     eprintln!("redoxer build - cargo build with Redox target");
     eprintln!("redoxer cc - run C GNU compiler with Redox target");
     eprintln!("redoxer check - cargo check with Redox target");
+    eprintln!("redoxer clippy - cargo clippy with Redox target");
     eprintln!("redoxer cxx - run C++ GNU compiler with Redox target");
     eprintln!("redoxer doc - cargo doc with Redox target");
     eprintln!("redoxer env - execute a command in cross-compilation environment");
@@ -151,8 +152,8 @@ pub(crate) fn parse_bool_env(name: &str) -> Option<bool> {
 pub fn main(args: &[String]) {
     match args.get(1) {
         Some(arg) => match arg.as_str() {
-            "bench" | "build" | "check" | "doc" | "fetch" => cargo::main(args),
-            "install" | "run" | "rustc" | "test" => cargo::main(args),
+            "bench" | "build" | "check" | "clippy" | "doc" => cargo::main(args),
+            "fetch" | "install" | "run" | "rustc" | "test" => cargo::main(args),
             "ar" | "cc" | "cxx" | "env" => env::main(args),
             #[cfg(feature = "cli-exec")]
             "exec" => exec::main(args),
