@@ -46,6 +46,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     let cargo_target_var = cc_target_var.to_uppercase();
     let is_clang = crate::is_use_clang();
     let is_cc = program.as_ref() != "env" && program.as_ref() != "cargo";
+    let is_host = host_target() == target;
     let mut command = process::Command::new(program);
     for (k, v) in gnu_targets.iter() {
         if (*k == "CC" || *k == "CXX")
@@ -80,7 +81,12 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     //      https://github.com/rust-lang/cargo/issues/4423
     //      which claims there's no RUSTFLAGS for build.rs
     // 3. There are no CARGO_TARGET_xxx_ENCODED_RUSTFLAGS
-    let mut rustflags = env::var("RUSTFLAGS").unwrap_or_default();
+    let rustflags_env = if is_host {
+        "REDOXER_HOST_RUSTFLAGS"
+    } else {
+        "RUSTFLAGS"
+    };
+    let mut rustflags = env::var(rustflags_env).unwrap_or_default();
     if target_is_64bit(target) {
         append_flag(&mut rustflags, "-C force-frame-pointers=yes");
     }
@@ -94,7 +100,12 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     }
 
     // CPPFLAGS
-    let mut cppflags = env::var("CPPFLAGS").unwrap_or_else(|_| String::new());
+    let cppflags_env = if is_host {
+        "REDOXER_HOST_CPPFLAGS"
+    } else {
+        "CPPFLAGS"
+    };
+    let mut cppflags = env::var(cppflags_env).unwrap_or_else(|_| String::new());
     match target {
         "aarch64-unknown-redox" => append_flag(&mut cppflags, "-mno-outline-atomics"),
         "riscv64gc-unknown-redox" => append_flag(&mut cppflags, "-march=rv64gc -mabi=lp64d"),
@@ -102,8 +113,13 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     }
 
     // LDFLAGS
+    let ldflags_env = if is_host {
+        "REDOXER_HOST_LDFLAGS"
+    } else {
+        "LDFLAGS"
+    };
     #[allow(unused_mut)]
-    let mut ldflags = env::var("LDFLAGS").unwrap_or_default();
+    let mut ldflags = env::var(ldflags_env).unwrap_or_default();
     // TODO: https://gitlab.redox-os.org/redox-os/redox/-/issues/1788
     // if is_clang {
     //     append_flag(&mut ldflags, "-fuse-ld=lld");
@@ -142,18 +158,26 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
         if is_cc {
             command.args(cppflags.split_ascii_whitespace());
         }
+    } else if is_host {
+        command.env_remove("CPPFLAGS");
+        command.env_remove(format!("CFLAGS_{cc_target_var}"));
+        command.env_remove(format!("CXXFLAGS_{cc_target_var}"));
     }
     if !ldflags.is_empty() {
         command.env("LDFLAGS", &ldflags);
         if is_cc {
             command.args(ldflags.split_ascii_whitespace());
         }
+    } else if is_host {
+        command.env_remove("LDFLAGS");
     }
     if !rustflags.is_empty() {
         command.env(
             format!("CARGO_TARGET_{cargo_target_var}_RUSTFLAGS"),
             rustflags,
         );
+        command.env_remove("RUSTFLAGS");
+    } else if is_host {
         command.env_remove("RUSTFLAGS");
     }
 
