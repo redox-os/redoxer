@@ -38,7 +38,8 @@ RUN redoxer toolchain
 RUN redoxer exec true
 
 # Ensure redoxer exec network is working
-RUN redoxer exec pkg test
+# TODO: https://gitlab.redox-os.org/redox-os/relibc/-/work_items/296
+# RUN redoxer exec pkg test
 
 # Ensure redoxer test is working
 RUN cd /root/redoxer/example && redoxer test
