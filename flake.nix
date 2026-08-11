@@ -1,7 +1,10 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     systems.url = "github:nix-systems/default-linux";
   };
 
@@ -11,7 +14,7 @@
 
       mkRexoder = { rustPlatform, lib, pkg-config, fuse3, ... }: rustPlatform.buildRustPackage rec {
         pname = "redoxer";
-        version = "0.2.38";
+        version = "0.2.63";
 
         src = builtins.path {
           path = ./.;
