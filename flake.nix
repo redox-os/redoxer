@@ -51,7 +51,7 @@
           };
         in
         {
-          default = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
+          default = rustPlatform.buildRustPackage (finalAttrs: {
             pname = manifest.name;
             version = manifest.version;
             src = pkgs.lib.cleanSource ./.;
