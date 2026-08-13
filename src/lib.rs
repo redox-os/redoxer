@@ -58,7 +58,7 @@ fn usage() {
     eprintln!("redoxer write-exec - write redoxer exec test configuration");
     eprintln!("redoxer toolchain - install toolchain");
     eprintln!();
-    eprintln!("Visit https://crates.io/crates/redox_installer for more help");
+    eprintln!("Visit https://crates.io/crates/redoxer for more help");
     process::exit(1);
 }
 
