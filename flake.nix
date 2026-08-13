@@ -1,79 +1,95 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
-    systems.url = "github:nix-systems/default-linux";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, rust-overlay, systems, ... }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      rust-overlay,
+      treefmt-nix,
+      ...
+    }:
     let
-      eachSystem = nixpkgs.lib.genAttrs (import systems);
+      systems = [
+        "i686-linux"
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
 
-      mkRexoder = { rustPlatform, lib, pkg-config, fuse3, ... }: rustPlatform.buildRustPackage rec {
-        pname = "redoxer";
-        version = "0.2.38";
+      overlays = [ rust-overlay.overlays.default ];
 
-        src = builtins.path {
-          path = ./.;
-          name = pname;
-        };
-        cargoLock.lockFile = ./Cargo.lock;
-
-        meta = {
-          description = "The tool used to build/run Rust programs (and C/C++ programs with zero dependencies) inside of a Redox VM.";
-          homepage = "https://gitlab.redox-os.org/redox-os/redoxer";
+      pkgsFor =
+        system:
+        import nixpkgs {
+          inherit system overlays;
         };
 
-        nativeBuildInputs = [
-          pkg-config
-        ];
-
-        buildInputs = [
-          fuse3
-        ];
-      };
+      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f (pkgsFor system));
+      treefmtEval = forAllSystems (pkgs: treefmt-nix.lib.evalModule pkgs ./treefmt.nix);
     in
     {
-      apps = eachSystem (system: {
-        default = {
-          type = "app";
-          program = "${self.packages.${system}.default}/bin/redoxer";
+      packages = forAllSystems (
+        pkgs:
+        let
+          manifest = (pkgs.lib.importTOML ./Cargo.toml).package;
+
+          rustToolchain = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+
+          rustPlatform = pkgs.makeRustPlatform {
+            cargo = rustToolchain;
+            rustc = rustToolchain;
+          };
+        in
+        {
+          default = pkgs.rustPlatform.buildRustPackage (finalAttrs: {
+            pname = manifest.name;
+            version = manifest.version;
+            src = pkgs.lib.cleanSource ./.;
+            cargoLock.lockFile = ./Cargo.lock;
+
+            meta = {
+              description = manifest.description;
+              homepage = manifest.repository;
+            };
+
+            nativeBuildInputs = with pkgs; [
+              pkg-config
+            ];
+
+            buildInputs = with pkgs; [
+              fuse3
+            ];
+          });
+        }
+      );
+
+      devShells = forAllSystems (pkgs: {
+        default = pkgs.mkShell {
+          inputsFrom = [ self.packages.${pkgs.stdenv.hostPlatform.system}.default ];
+
+          packages = with pkgs; [
+            nixd
+          ];
         };
       });
 
-      packages = eachSystem (system:
-        let
-          pkgs = import nixpkgs {
-            inherit system;
-          };
-        in
-        {
-          default = pkgs.callPackage mkRexoder { };
-        });
+      formatter = forAllSystems (
+        pkgs: treefmtEval.${pkgs.stdenv.hostPlatform.system}.config.build.wrapper
+      );
 
-      overlays.default = final: prev: {
-        redoxer = prev.callPackage mkRexoder { };
-      };
+      checks = forAllSystems (pkgs: {
+        formatting = treefmtEval.${pkgs.stdenv.hostPlatform.system}.config.build.check self;
+      });
 
-      devShells = eachSystem (system:
-        let
-          pkgs = import nixpkgs {
-            inherit system;
-
-            overlays = [ rust-overlay.overlays.default ];
-          };
-
-          rust-toolchain = (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml).override {
-            extensions = [ "rust-src" "rust-analyzer" ];
-          };
-        in
-        {
-          default = pkgs.mkShell {
-            packages = with pkgs; [
-              pkg-config
-              fuse3
-            ] ++ [ rust-toolchain ];
-          };
-        });
     };
 }
