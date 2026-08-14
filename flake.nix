@@ -90,6 +90,5 @@
       checks = forAllSystems (pkgs: {
         formatting = treefmtEval.${pkgs.stdenv.hostPlatform.system}.config.build.check self;
       });
-
     };
 }

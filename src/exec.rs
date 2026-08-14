@@ -105,7 +105,7 @@ fn kvm_accessible() -> Result<(), io::Error> {
 pub fn fuse_accessible() -> Result<(), io::Error> {
     // TODO: A faster way than actually try to mount?
     let t = tempfile::tempdir()?;
-    fuser::Session::new(crate::redoxfs::DummyFS, t.path(), &[])?.unmount();
+    fuser::Session::new(crate::redoxfs::DummyFS, t.path(), &fuser::Config::default())?.unmount();
     Ok(())
 }
 
