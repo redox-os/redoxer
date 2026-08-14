@@ -14,9 +14,9 @@ sha2 = "0.10"
 fuser = { version = "0.16", optional = true }
 libc = { version = "0.2", optional = true }
 proc-mounts = { version = "0.3", optional = true }
-redox_installer = { version = "0.2.42", optional = true }
-redox-pkg = { version = "0.3.1", features = ["indicatif"], optional = true }
-redox_syscall = { version = "=0.7", optional = true }
+redox_installer = { version = "0.2", git = "https://gitlab.redox-os.org/redox-os/installer.git", optional = true }
+redox-pkg = { version = "0.3", features = ["indicatif"], optional = true }
+redox_syscall = { version = "0.9", optional = true }
 redoxfs = { version = "0.9", optional = true }
 tempfile = { version = "3.20", optional = true }
 toml = { version = "0.8", optional = true }
