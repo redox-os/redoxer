@@ -55,7 +55,12 @@
             pname = manifest.name;
             version = manifest.version;
             src = pkgs.lib.cleanSource ./.;
-            cargoLock.lockFile = ./Cargo.lock;
+            cargoLock = {
+              lockFile = ./Cargo.lock;
+              outputHashes = {
+                "redox_installer-0.2.42" = "sha256-bSPGstaseb7KKFvkq6qAoOjjaXojuIwizpSR+szS+Yg=";
+              };
+            };
 
             meta = {
               description = manifest.description;
@@ -90,6 +95,5 @@
       checks = forAllSystems (pkgs: {
         formatting = treefmtEval.${pkgs.stdenv.hostPlatform.system}.config.build.check self;
       });
-
     };
 }
