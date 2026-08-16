@@ -1524,6 +1524,8 @@ version = "0.2.63"
 dependencies = [
  "anyhow",
  "dirs",
+ "fuser",
+ "libc",
  "proc-mounts",
  "redox-pkg",
  "redox_installer",

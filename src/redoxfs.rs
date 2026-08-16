@@ -372,3 +372,7 @@ fn resize<D: redoxfs::Disk>(fs: &mut FileSystem<D>, shrink: bool) -> Result<(u64
 
     Ok((old_size, new_size))
 }
+
+pub(crate) struct DummyFS;
+
+impl fuser::Filesystem for DummyFS {}
