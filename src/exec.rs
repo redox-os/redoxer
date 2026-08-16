@@ -1,5 +1,6 @@
 use anyhow::{bail, Context};
 use std::collections::{HashMap, HashSet};
+use std::os::fd::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::process::{self, Command, Stdio};
 use std::{fs, io};
@@ -36,7 +37,7 @@ pub fn qemu_has_kvm() -> bool {
     }
     let host = get_arch(host_target());
     let target = get_arch(target());
-    Path::new("/dev/kvm").exists()
+    kvm_accessible().is_ok()
         && match (host, target) {
             ("x86_64", "x86_64" | "i586" | "i686") => true,
             // https://gitlab.redox-os.org/redox-os/redox/-/issues/1714
@@ -71,6 +72,28 @@ pub fn qemu_disk_size() -> u64 {
     } else {
         DISK_SIZE
     }
+}
+
+#[allow(unused)]
+fn kvm_accessible() -> Result<(), io::Error> {
+    let mut file = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open("/dev/kvm")?;
+    // https://docs.kernel.org/virt/kvm/api.html#kvm-get-api-version
+    #[cfg(target_os = "linux")]
+    if unsafe { libc::ioctl(file.as_raw_fd(), 0xae00) } == -1 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(())
+}
+
+#[allow(unused)]
+pub fn fuse_accessible() -> Result<(), io::Error> {
+    // TODO: A faster way than actually try to mount?
+    let t = tempfile::tempdir()?;
+    fuser::Session::new(crate::redoxfs::DummyFS, t.path(), &[])?.unmount();
+    Ok(())
 }
 
 #[rustfmt::skip]
@@ -311,7 +334,7 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
         );
         process::exit(1);
     }
-    let kvm = qemu_has_kvm();
+    let kvm = config.kvm;
 
     let fuse = config.fuse;
 
@@ -492,7 +515,21 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
 }
 
 fn usage() -> ! {
-    eprintln!("redoxer exec [-f|--folder folder] [-f|--folder folder:/path/in/redox] [-a|--artifact folder] [-a|--artifact folder:/path/in/redox] [-g|--gui] [-h|--help] [-i|--install-config] [-o|--output file] [--] <command> [arguments]...");
+    eprintln!(
+        "redoxer exec [options...] [--] <command> [arguments]... \n\
+        options: \
+        \n    [-f|--folder folder] \
+        \n    [-f|--folder folder:/path/in/redox] \
+        \n    [-a|--artifact folder] \
+        \n    [-a|--artifact folder:/path/in/redox] \
+        \n    [-g|--gui] \
+        \n    [-h|--help] \
+        \n    [-i|--install-config file] \
+        \n    [-o|--output file]"
+    );
+    eprintln!();
+    eprintln!("redoxer exec - /dev/kvm: {:?}", kvm_accessible());
+    eprintln!("redoxer exec - /dev/fuse: {:?}", fuse_accessible());
     process::exit(1);
 }
 
@@ -502,6 +539,7 @@ pub struct RedoxerExecConfig {
     pub qemu_binary: Option<String>,
     pub qemu_args: Option<String>,
     pub fuse: bool,
+    pub kvm: bool,
     // Installer config
     pub config_name: String,
     pub config_toml: String,
@@ -556,8 +594,8 @@ impl RedoxerExecConfig {
         let mut config = RedoxerExecConfig {
             qemu_binary: var("REDOXER_QEMU_BINARY").ok(),
             qemu_args: var("REDOXER_QEMU_ARGS").ok(),
-            fuse: parse_bool_env("REDOXER_USE_FUSE")
-                .unwrap_or_else(|| Path::new("/dev/fuse").exists()),
+            fuse: parse_bool_env("REDOXER_USE_FUSE").unwrap_or_else(|| fuse_accessible().is_ok()),
+            kvm: parse_bool_env("REDOXER_USE_KVM").unwrap_or_else(|| qemu_has_kvm()),
             config_name: "base".into(),
             config_toml: BASE_TOML.into(),
             // other options should be passed from args
