@@ -1,24 +1,24 @@
 FROM ubuntu:24.04
 
 # Install dependencies
-RUN export DEBIAN_FRONTEND=noninteractive && \
-    apt-get update -qq && \
-    apt-get install -y -qq --no-install-recommends \
-      build-essential \
-      ca-certificates \
-      curl \
-      expect \
-      fuse \
-      libfuse-dev \
-      pkg-config \
-      qemu-system-x86 \
-      rsync \
-      nasm \
+RUN export DEBIAN_FRONTEND=noninteractive \
+    && apt-get update -qq \
+    && apt-get install -y -qq --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        curl \
+        expect \
+        fuse \
+        libfuse-dev \
+        pkg-config \
+        qemu-system-x86 \
+        rsync \
+        nasm \
     && rm -rf /var/lib/apt/lists/*
 
 # Install rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-    sh -s -- --default-toolchain nightly --profile minimal -y
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- --default-toolchain nightly --profile minimal -y
 
 # Set path
 ENV PATH=/root/.cargo/bin:$PATH
@@ -41,4 +41,4 @@ RUN redoxer exec pkg test
 RUN cd /root/redoxer/example && redoxer test
 
 # Strip unneeded files
-RUN rm -rf /root/redoxer /root/.cargo/git /root/.cargo/registry 
+RUN rm -rf /root/redoxer /root/.cargo/git /root/.cargo/registry
