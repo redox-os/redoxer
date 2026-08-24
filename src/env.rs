@@ -107,7 +107,6 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     };
     let mut cppflags = env::var(cppflags_env).unwrap_or_else(|_| String::new());
     match target {
-        "aarch64-unknown-redox" => append_flag(&mut cppflags, "-mno-outline-atomics"),
         "riscv64gc-unknown-redox" => append_flag(&mut cppflags, "-march=rv64gc -mabi=lp64d"),
         _ => {}
     }
