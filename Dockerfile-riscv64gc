@@ -32,10 +32,14 @@ RUN cargo install --path /root/redoxer --locked
 # Install redoxer toolchain
 RUN redoxer toolchain
 
-# TODO: RISC-V does not have a working driver for redoxer
+# Ensure redoxer exec is working
+RUN redoxer exec true
 
-# Ensure redoxer build is working
-RUN cd /root/redoxer/example && redoxer build
+# Ensure redoxer exec network is working
+RUN redoxer exec pkg test
+
+# Ensure redoxer test is working
+RUN cd /root/redoxer/example && redoxer test
 
 # Strip unneeded files
 RUN rm -rf /root/redoxer /root/.cargo/git /root/.cargo/registry
