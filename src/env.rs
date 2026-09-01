@@ -230,32 +230,14 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
         let target_flag = if is_host {
             String::new()
         } else {
-            let toolchain = toolchain()
-                .expect("Should have toolchain init")
-                .join(gnu_target());
-            // TODO: define __redox__ in clang driver
-            format!(
-                " --target={} --sysroot={} -D__redox__",
-                gnu_target(),
-                toolchain.display()
-            )
+            format!(" --target={}", target())
         };
 
         let target_cxxflag = if is_host {
             String::new()
         } else {
-            let toolchain = toolchain()
-                .expect("Should have toolchain init")
-                .join(gnu_target())
-                .join("include/c++/13.2.0");
-            // TODO: define headers in clang driver
-            // https://discourse.llvm.org/t/40477/11
-            format!(
-                " -I{} -I{} -I{}",
-                toolchain.display(),
-                toolchain.join(gnu_target()).display(),
-                toolchain.join("backward").display()
-            )
+            // TODO: libcxx is not ready (see llvm-rt21 recipe)
+            " -stdlib=libstdc++".to_string()
         };
 
         h.insert("AR", "llvm-ar".to_string());
