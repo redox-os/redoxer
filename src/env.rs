@@ -230,7 +230,7 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
         let target_flag = if is_host {
             String::new()
         } else {
-            format!(" --target={}", target())
+            format!(" --target={}", gnu_target())
         };
 
         let target_cxxflag = if is_host {
