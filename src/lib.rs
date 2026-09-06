@@ -139,6 +139,10 @@ pub fn is_use_clang() -> bool {
     parse_bool_env("REDOXER_USE_CLANG").unwrap_or(false)
 }
 
+pub fn is_use_lto() -> bool {
+    parse_bool_env("REDOXER_USE_LTO").unwrap_or(false)
+}
+
 pub(crate) fn parse_bool_env(name: &str) -> Option<bool> {
     match std::env::var(name).as_deref() {
         Ok("true" | "1") => Some(true),

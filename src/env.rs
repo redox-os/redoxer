@@ -27,6 +27,12 @@ fn append_flag2(buf: &mut String, flag: &'static str, flag2: &str) {
 pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Command> {
     let toolchain_dir = toolchain().context("unable to init toolchain")?;
 
+    let mut command = process::Command::new(program.as_ref());
+    if std::env::var("REDOXER_REENTRANT").is_ok() {
+        // TODO: do not wrap cargo as redoxer_cookbook and erase this logic
+        return Ok(command);
+    }
+
     // PATH must be set first so cargo is sourced from the toolchain path
     {
         let path = env::var_os("PATH").unwrap_or_default();
@@ -45,9 +51,9 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     let cc_target_var = target.replace("-", "_");
     let cargo_target_var = cc_target_var.to_uppercase();
     let is_clang = crate::is_use_clang();
+    let is_lto = crate::is_use_lto();
     let is_cc = program.as_ref() != "env" && program.as_ref() != "cargo";
     let is_host = host_target() == target;
-    let mut command = process::Command::new(program);
     for (k, v) in gnu_targets.iter() {
         if (*k == "CC" || *k == "CXX")
             && let Ok(cc_wrapper) = std::env::var("CC_WRAPPER")
@@ -63,10 +69,10 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     // CARGO
     command.env(
         format!("CARGO_TARGET_{cargo_target_var}_LINKER"),
-        if is_clang {
-            "clang"
+        &if is_clang {
+            format!("{target}-clang")
         } else {
-            gnu_targets.get("CC").unwrap()
+            gnu_targets.get("CC").unwrap().to_string()
         },
     );
     command.env("RUSTUP_TOOLCHAIN", &toolchain_dir);
@@ -90,13 +96,9 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     if target_is_64bit(target) {
         append_flag(&mut rustflags, "-C force-frame-pointers=yes");
     }
-
-    if is_clang && host_target() != target {
-        // add args from cc
-        let cc_args = gnu_targets.get("CC").unwrap().split(' ').skip(1);
-        for arg in cc_args {
-            append_flag2(&mut rustflags, "-C link-arg=", arg);
-        }
+    if is_clang && is_lto {
+        // only with clang that LTO can work in rust
+        append_flag(&mut rustflags, "-C lto=thin -C linker-plugin-lto");
     }
 
     // CPPFLAGS
@@ -111,6 +113,16 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
         "riscv64gc-unknown-redox" => append_flag(&mut cppflags, "-march=rv64gc -mabi=lp64d"),
         _ => {}
     }
+    if is_lto {
+        append_flag(
+            &mut cppflags,
+            if is_clang {
+                "-flto=thin"
+            } else {
+                "-flto=auto -fno-fat-lto-objects"
+            },
+        );
+    }
 
     // LDFLAGS
     let ldflags_env = if is_host {
@@ -120,10 +132,11 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     };
     #[allow(unused_mut)]
     let mut ldflags = env::var(ldflags_env).unwrap_or_default();
-    // TODO: https://gitlab.redox-os.org/redox-os/redox/-/issues/1788
-    // if is_clang {
-    //     append_flag(&mut ldflags, "-fuse-ld=lld");
-    // }
+
+    if is_lto {
+        // all CPPFLAGS need to be passed again to LDFLAGS (unquoted)
+        append_flag2(&mut ldflags, "", &cppflags);
+    }
 
     #[cfg(feature = "cli-pkg")]
     if let Some(sysroot) = crate::pkg::get_sysroot() {
@@ -181,6 +194,8 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
         command.env_remove("RUSTFLAGS");
     }
 
+    command.env("REDOXER_REENTRANT", "1");
+
     Ok(command)
 }
 
@@ -207,13 +222,12 @@ fn inner<I: Iterator<Item = String>>(program: &str, args: I) -> anyhow::Result<(
 fn generate_gnu_targets() -> HashMap<&'static str, String> {
     let is_host = host_target() == target();
     let mut h = HashMap::new();
+    let target_prefix = if is_host {
+        String::new()
+    } else {
+        format!("{}-", gnu_target())
+    };
     if !crate::is_use_clang() {
-        let target_prefix = if is_host {
-            String::new()
-        } else {
-            format!("{}-", gnu_target())
-        };
-
         h.insert("AR", format!("{target_prefix}gcc-ar"));
         h.insert("AS", format!("{target_prefix}as"));
         h.insert("CC", format!("{target_prefix}gcc"));
@@ -251,7 +265,7 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
         h.insert("AS", format!("clang{target_flag}"));
         h.insert("CC", format!("clang{target_flag}"));
         h.insert("CXX", format!("clang++{target_flag}{target_cxxflag}"));
-        h.insert("PKG_CONFIG", "pkg-config".to_string());
+        h.insert("PKG_CONFIG", format!("{target_prefix}pkg-config"));
     }
     if is_host {
         for (k, v) in h.iter_mut() {
