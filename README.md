@@ -12,6 +12,8 @@ redoxer env <command> [arguments]...
     The toolchain will be initialized by `redoxer toolchain`
     Environment flags:
         REDOXER_SYSROOT      Specify sysroot to link (default is target/$TARGET/sysroot on Cargo projects)
+        REDOXER_USE_CLANG    Use clang as the default compiler
+        REDOXER_USE_LTO      Add thin LTO to compiler flags
 
 redoxer <bench | build | check | doc | fetch | install | run | rustc | test> [-g|--gui] [-o|--output file] [--] [arguments]
     Run as cargo passed by `redoxer env cargo`
