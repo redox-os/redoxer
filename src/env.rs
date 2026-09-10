@@ -138,6 +138,13 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
         append_flag2(&mut ldflags, "", &cppflags);
     }
 
+    if is_host && is_clang {
+        if cfg!(target_os = "linux") {
+            // LLVMgold.so is not shipped to the toolchain
+            append_flag(&mut ldflags, "-fuse-ld=lld");
+        }
+    }
+
     #[cfg(feature = "cli-pkg")]
     if let Some(sysroot) = crate::pkg::get_sysroot() {
         // pkg-config crate specific
