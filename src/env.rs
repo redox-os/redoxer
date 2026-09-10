@@ -98,7 +98,10 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     }
     if is_clang && is_lto {
         // only with clang that LTO can work in rust
-        append_flag(&mut rustflags, "-C lto=thin -C linker-plugin-lto");
+        append_flag(
+            &mut rustflags,
+            "-C lto=thin -C linker-plugin-lto -C embed-bitcode=yes",
+        );
     }
 
     // CPPFLAGS
