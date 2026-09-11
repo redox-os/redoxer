@@ -62,6 +62,12 @@ pub fn qemu_use_live_disk() -> bool {
     }
 }
 
+pub fn qemu_disk_device() -> &'static str {
+    match target() {
+        "i586-unknown-redox" | "i686-unknown-redox" => "ide",
+        _ => "virtio",
+    }
+}
 pub fn qemu_disk_size() -> u64 {
     if qemu_use_live_disk() {
         DISK_SIZE_LIVE
@@ -421,7 +427,11 @@ fn inner(config: &RedoxerExecConfig) -> anyhow::Result<i32> {
         let mut command = Command::new(qemu_binary);
 
         let chardev = format!("file,id=log,path={}", redoxer_log.display());
-        let drive = format!("file={},format=raw,if=virtio", redoxer_bin.display());
+        let drive = format!(
+            "file={},format=raw,if={}",
+            redoxer_bin.display(),
+            qemu_disk_device()
+        );
         let mut default_args = qemu_default_args();
         default_args.extend(vec!["-chardev", &chardev, "-drive", &drive]);
         if kvm {
