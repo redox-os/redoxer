@@ -70,7 +70,7 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     command.env(
         format!("CARGO_TARGET_{cargo_target_var}_LINKER"),
         &if is_clang {
-            format!("{target}-clang")
+            format!("{gnu_target}-clang")
         } else {
             gnu_targets.get("CC").unwrap().to_string()
         },
