@@ -68,6 +68,17 @@ pub fn qemu_disk_device() -> &'static str {
         _ => "virtio",
     }
 }
+
+pub fn qemu_machine() -> &'static str {
+    match target() {
+        "i586-unknown-redox" | "i686-unknown-redox" => "pc",
+        "x86_64-unknown-redox" => "q35",
+        "aarch64-unknown-redox" => "virt",
+        "riscv64gc-unknown-redox" => "virt,acpi=off",
+        _ => panic!("Unknown target architecture for QEMU"),
+    }
+}
+
 pub fn qemu_disk_size() -> u64 {
     if qemu_use_live_disk() {
         DISK_SIZE_LIVE
@@ -106,10 +117,10 @@ pub fn qemu_default_args() -> Vec<&'static str> {
         "-smp", "4",
         "-netdev", "user,id=net0",
         "-device", "e1000,netdev=net0",
+        "-machine", qemu_machine(),
     ];
     default_args.extend(match target() {
         "i586-unknown-redox" | "i686-unknown-redox" | "x86_64-unknown-redox" => vec![
-            "-machine", "q35", 
             "-serial", "mon:stdio",
             "-device", "isa-debugcon,chardev=log",
             "-device", "isa-debug-exit",
@@ -123,7 +134,6 @@ pub fn qemu_default_args() -> Vec<&'static str> {
                 todo!("Can't figure out where is the EFI file!")
             };
             vec![
-                "-machine", "virt",
                 "-serial", "chardev:debug",
                 "-mon", "chardev=debug",
                 efi_arg, efi_file,
@@ -140,7 +150,6 @@ pub fn qemu_default_args() -> Vec<&'static str> {
                 todo!("Can't figure out where is the EFI file!")
             };
             vec![
-                "-machine", "virt,acpi=off",
                 "-serial", "chardev:debug",
                 "-mon", "chardev=debug",
                 efi_arg, efi_file,
