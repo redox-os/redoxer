@@ -9,6 +9,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
         curl \
         expect \
         fuse \
+        ipxe-qemu \
         libfuse-dev \
         pkg-config \
         qemu-efi-riscv64 \
