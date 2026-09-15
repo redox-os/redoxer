@@ -125,6 +125,7 @@ pub fn run_install_mount(
         bootloader_bios: &bootloader_bios,
         bootloader_efi: &bootloader_efi,
         password_opt: None,
+        efi_partition_path: None,
         efi_partition_size: None,
         skip_partitions: false,
     };
@@ -158,6 +159,7 @@ pub fn archive_image(
         bootloader_bios: &bootloader_bios,
         bootloader_efi: &bootloader_efi,
         password_opt: None,
+        efi_partition_path: None,
         efi_partition_size: None,
         skip_partitions: false,
     };
