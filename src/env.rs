@@ -103,6 +103,9 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
             "-C lto=thin -C linker-plugin-lto -C embed-bitcode=yes",
         );
     }
+    if target == "wasm32-wasip1" {
+        append_flag(&mut rustflags, "-C link-arg=-Wl,--no-entry");
+    }
 
     // CPPFLAGS
     let cppflags_env = if is_host {
@@ -146,6 +149,10 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
             // LLVMgold.so is not shipped to the toolchain
             append_flag(&mut ldflags, "-fuse-ld=lld");
         }
+    }
+
+    if target == "wasm32-wasip1" {
+        append_flag(&mut ldflags, "-Wl,--no-entry");
     }
 
     #[cfg(feature = "cli-pkg")]
