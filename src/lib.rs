@@ -21,6 +21,7 @@ const SUPPORTED_TARGETS: &[&str] = &[
     "riscv64gc-unknown-redox",
     "x86_64-unknown-linux-relibc",
     "aarch64-unknown-linux-relibc",
+    "wasm32-wasip1",
 ];
 
 fn redoxer_dir() -> path::PathBuf {
