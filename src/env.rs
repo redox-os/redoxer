@@ -203,6 +203,12 @@ pub fn command<S: AsRef<ffi::OsStr>>(program: S) -> anyhow::Result<process::Comm
     }
     let rustflags_key = format!("CARGO_TARGET_{cargo_target_var}_RUSTFLAGS");
     command.env(format!("REDOXER_RUSTFLAGS_KEY"), &rustflags_key);
+    if !is_host {
+        command.env(
+            format!("BINDGEN_EXTRA_CLANG_ARGS_{}", cc_target_var),
+            format!("--sysroot={}/{gnu_target}", toolchain_dir.display()),
+        );
+    }
     if !rustflags.is_empty() {
         command.env(&rustflags_key, rustflags);
         command.env_remove("RUSTFLAGS");
