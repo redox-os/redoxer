@@ -23,6 +23,12 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
     | sh -s -- --default-toolchain nightly --profile minimal -y
 
+# Install cbindgen
+RUN CBINDGEN_NAME="$( [ "$(uname -m)" = "x86_64" ] && echo "ubuntu22.04" || echo "ubuntu22.04-aarch64" )" \
+    && CBINDGEN_URL="https://github.com/mozilla/cbindgen/releases/download/0.29.0/cbindgen-${CBINDGEN_NAME}" \
+    && curl -fsSL "${CBINDGEN_URL}" -o /root/.cargo/bin/cbindgen \
+    && chmod +x /root/.cargo/bin/cbindgen
+
 # Set path
 ENV PATH=/root/.cargo/bin:$PATH
 ENV TARGET=aarch64-unknown-redox
