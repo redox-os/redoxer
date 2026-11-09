@@ -24,19 +24,24 @@ fn pkg_inner(
     cmd: PkgCommand,
     pkgs: Vec<PackageName>,
 ) -> Result<(), Error> {
-    let callback = IndicatifCallback::new();
-    pkg_dir_init(&sysroot, source).map_err(Error::IO)?;
-    let mut library = Library::new(sysroot, target(), Rc::new(RefCell::new(callback)))?;
+    match pkg_dir_init(&sysroot, source) {
+        Ok(()) => {
+            let callback = IndicatifCallback::new();
 
-    match cmd {
-        PkgCommand::Install => library.install(pkgs),
-        PkgCommand::Update => library.update(pkgs),
-        PkgCommand::Remove => library.uninstall(pkgs),
-    }?;
+            let mut library = Library::new(sysroot, target(), Rc::new(RefCell::new(callback)))?;
 
-    library.apply()?;
+            match cmd {
+                PkgCommand::Install => library.install(pkgs),
+                PkgCommand::Update => library.update(pkgs),
+                PkgCommand::Remove => library.uninstall(pkgs),
+            }?;
 
-    Ok(())
+            library.apply()?;
+
+            Ok(())
+        }
+        Err(err) => Err(Error::IO(err, sysroot, "Failed to prepare sysroot dir")),
+    }
 }
 
 fn pkg_dir_init(sysroot: &Path, source: String) -> io::Result<()> {

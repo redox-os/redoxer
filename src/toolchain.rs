@@ -76,7 +76,7 @@ fn check_shasum(shasum: &Vec<(String, PathBuf)>) -> io::Result<bool> {
         }
 
         let result = hasher.finalize();
-        let actual_hash = format!("{result:x}");
+        let actual_hash = base16ct::lower::encode_string(&result);
 
         if actual_hash != *expected_hash {
             all_match = false;
