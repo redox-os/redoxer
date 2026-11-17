@@ -263,19 +263,6 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
         h.insert("READELF", format!("{target_prefix}readelf"));
         h.insert("STRIP", format!("{target_prefix}strip"));
     } else {
-        let target_flag = if is_host {
-            String::new()
-        } else {
-            format!(" --target={}", gnu_target())
-        };
-
-        let target_cxxflag = if is_host {
-            String::new()
-        } else {
-            // TODO: libcxx is not ready (see llvm-rt21 recipe)
-            " -stdlib=libstdc++".to_string()
-        };
-
         h.insert("AR", "llvm-ar".to_string());
         h.insert("LD", "ld.lld".to_string());
         h.insert("NM", "llvm-nm".to_string());
@@ -284,9 +271,9 @@ fn generate_gnu_targets() -> HashMap<&'static str, String> {
         h.insert("RANLIB", "llvm-ranlib".to_string());
         h.insert("READELF", "llvm-readelf".to_string());
         h.insert("STRIP", "llvm-strip".to_string());
-        h.insert("AS", format!("clang{target_flag}"));
-        h.insert("CC", format!("clang{target_flag}"));
-        h.insert("CXX", format!("clang++{target_flag}{target_cxxflag}"));
+        h.insert("AS", format!("{target_prefix}clang"));
+        h.insert("CC", format!("{target_prefix}clang"));
+        h.insert("CXX", format!("{target_prefix}clang++"));
         h.insert("PKG_CONFIG", format!("{target_prefix}pkg-config"));
     }
     if is_host {
